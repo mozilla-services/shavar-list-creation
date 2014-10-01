@@ -8,6 +8,10 @@ import re
 import sys
 import time
 import urllib2
+import urlparse
+
+import boto.s3.connection
+import boto.s3.key
 
 parser = argparse.ArgumentParser(
   description="Generate digest256 list from disconnect",
@@ -22,6 +26,9 @@ parser.add_argument("--allowlist_url",
 parser.add_argument("--output_file",
   default="mozpub-track-digest256",
   help="The location of the output digest256 list")
+parser.add_argument("--s3_url",
+  default="",
+  help="The bucket to which to upload the output digest256 list, e.g. s3://mmc-shavar")
 # Unfortunately the support for boolean arguments in argparse is somewhat
 # limited. Be safe and manually set one of two flags instead of relying on type
 # conversion.
@@ -131,9 +138,11 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
 
   # Write safebrowsing-list format header
   output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes));
-
+  output_string = "a:%u:32:%s\n" % (chunk, hashdata_bytes);
   for o in output:
     output_file.write(o);
+    output_string = output_string + o
+  return output_string
 
 
 def main():
@@ -158,14 +167,20 @@ def main():
         continue
       allowed.add(line)
 
-  find_hosts(disconnect_json, allowed, chunk, output_file, log_file)
+  output_string = find_hosts(disconnect_json, allowed, chunk, output_file, log_file)
 
   output_file.close()
   log_file.close()
 
-  # Optionally upload to S3
-  if args.s3_upload:
-    print "Sorry, S3 upload is not yet supported"
+  # Optionally upload to S3. Both the S3 url and s3_upload arguments must be set.
+  if args.s3_upload and args.s3_url:
+    conn = boto.s3.connection.S3Connection()
+    url = urlparse.urlparse(args.s3_url)
+    bucket = conn.get_bucket(url.netloc)
+    k = boto.s3.key.Key(bucket)
+    k.key = args.output_file
+    k.set_contents_from_string(output_string)
+    print "Uploaded to s3"
   else:
     print "Skipping upload"
 
