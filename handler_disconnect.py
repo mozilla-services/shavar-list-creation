@@ -72,7 +72,7 @@ def canonicalize(d):
   return host + "/" + _path;
 
 
-def find_hosts(filename, f_out, f_dbg, f_log, chunk, allow_list):
+def find_hosts(filename, f_out, f_log, chunk, allow_list):
   f_in = open(filename, "r")
 
   # total number of bytes that will be written to f_out for hashed hosts 
@@ -120,24 +120,19 @@ def find_hosts(filename, f_out, f_dbg, f_log, chunk, allow_list):
                 f_log.write("error processing " + json.dumps(d) + "\n")
 
   # write safebrowsing-list format header
-  f_dbg.write("a:%u:32:%s\n" % (chunk, hashdata_bytes));
   f_out.write("a:%u:32:%s\n" % (chunk, hashdata_bytes));
-
-  # write safebrowsing-list format hash data
-  for o in output_dbg:
-    f_dbg.write("%s\n" % o);
 
   for o in output:
     f_out.write(o);
 
 
-def main(dir, f_out, f_dbg, f_log, chunk, allow_list=[]):
+def main(dir, f_out, f_log, chunk, allow_list=[]):
   for root, dirs, files in os.walk(dir):
     # Process all of the files, one by one
     if root.find(".hg") != -1:
       continue
     for name in files:
-      find_hosts(os.path.join(root, name), f_out, f_dbg, f_log, chunk,
+      find_hosts(os.path.join(root, name), f_out, f_log, chunk,
                  allow_list);
       chunk += 1;
 

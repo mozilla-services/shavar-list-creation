@@ -25,18 +25,13 @@ def main():
   # representation of extracted URLs in safebrowsing-list format
   f_out = open(output_file, "wb")
 
-  # output file,
-  # debug version of f_out. binary hashes are now in hex format
-  # and they are followed by a LF
-  f_dbg = open(output_file + ".dbg", "w");
-
   # log file
   f_log = open(output_file + ".log", "w");
 
   # load our allowlist
+  allowed = set()
   if allowlist_file:
     with open(allowlist_file, "r") as f:
-      allowed = set()
       for line in f:
         line = line.strip()
         # don't add blank lines or comments
@@ -46,10 +41,9 @@ def main():
 
   print "[+] Processing", os.path.split(input_dir)[1];
   mod = __import__('handler_' + handler)
-  chunk = mod.main(input_dir, f_out, f_dbg, f_log, chunk, allowed);
+  chunk = mod.main(input_dir, f_out, f_log, chunk, allowed);
 
   f_out.close();
-  f_dbg.close();
   f_log.close();
 
   print "[+] Produced", (chunk - chunkInit), "chunks"
