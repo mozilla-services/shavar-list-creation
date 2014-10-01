@@ -10,7 +10,8 @@ import time
 import urllib2
 
 parser = argparse.ArgumentParser(
-  description="Generate digest256 list from disconnect")
+  description="Generate digest256 list from disconnect",
+  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--disconnect_url",
   help="The location of the Disconnect list",
   default="http://services.disconnect.me/disconnect-plaintext.json")
@@ -21,7 +22,15 @@ parser.add_argument("--allowlist_url",
 parser.add_argument("--output_file",
   default="mozpub-track-digest256",
   help="The location of the output digest256 list")
-
+# Unfortunately the support for boolean arguments in argparse is somewhat
+# limited. Be safe and manually set one of two flags instead of relying on type
+# conversion.
+group = parser.add_mutually_exclusive_group()
+group.add_argument("--s3_upload", dest="s3_upload", action="store_true",
+  help="Upload to S3")
+group.add_argument("--no_s3_upload", dest="s3_upload", action="store_false",
+  help="Don't upload to S3")
+group.set_defaults(s3_upload=False)
 
 # bring a URL to canonical form as described at 
 # https://developers.google.com/safe-browsing/developers_guide_v2
@@ -153,6 +162,12 @@ def main():
 
   output_file.close()
   log_file.close()
+
+  # Optionally upload to S3
+  if args.s3_upload:
+    print "Sorry, S3 upload is not yet supported"
+  else:
+    print "Skipping upload"
 
 if __name__ == "__main__":
   main()
