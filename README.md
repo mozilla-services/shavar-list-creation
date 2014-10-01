@@ -1,10 +1,9 @@
 shavar-list-creation
 ====================
 ```
-[mmc@ip-172-31-39-30 shavar-list-creation]$ ./lists2safebrowsing.py --help
 usage: lists2safebrowsing.py [-h] [--disconnect_url DISCONNECT_URL]
                              [--allowlist_url ALLOWLIST_URL]
-                             [--output_file OUTPUT_FILE]
+                             [--output_file OUTPUT_FILE] [--s3_url S3_URL]
                              [--s3_upload | --no_s3_upload]
 
 Generate digest256 list from disconnect
@@ -22,6 +21,8 @@ optional arguments:
   --output_file OUTPUT_FILE
                         The location of the output digest256 list (default:
                         mozpub-track-digest256)
+  --s3_url S3_URL       The bucket url to which to upload the output digest256
+                        list, e.g. s3://mmc-shavar (default: )
   --s3_upload           Upload to S3 (default: False)
   --no_s3_upload        Don't upload to S3 (default: False)
 ```
