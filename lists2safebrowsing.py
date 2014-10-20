@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import argparse
+import ConfigParser
 import hashlib
 import json
 import os
@@ -12,32 +12,6 @@ import urlparse
 
 import boto.s3.connection
 import boto.s3.key
-
-parser = argparse.ArgumentParser(
-  description="Generate digest256 list from disconnect",
-  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--disconnect_url",
-  help="The location of the Disconnect list",
-  default="http://services.disconnect.me/disconnect-plaintext.json")
-parser.add_argument("--allowlist_url",
-  default="https://raw.githubusercontent.com/mozilla-services/" +
-          "shavar-list-exceptions/master/allow_list",
-  help="The location of the allowlist")
-parser.add_argument("--output_file",
-  default="mozpub-track-digest256",
-  help="The location of the output digest256 list")
-parser.add_argument("--s3_url",
-  default="",
-  help="The bucket to which to upload the output digest256 list, e.g. s3://mmc-shavar")
-# Unfortunately the support for boolean arguments in argparse is somewhat
-# limited. Be safe and manually set one of two flags instead of relying on type
-# conversion.
-group = parser.add_mutually_exclusive_group()
-group.add_argument("--s3_upload", dest="s3_upload", action="store_true",
-  help="Upload to S3")
-group.add_argument("--no_s3_upload", dest="s3_upload", action="store_false",
-  help="Don't upload to S3")
-group.set_defaults(s3_upload=False)
 
 # bring a URL to canonical form as described at 
 # https://developers.google.com/safe-browsing/developers_guide_v2
@@ -115,7 +89,8 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
     # Skip content and Legacy categories
     if c.find("Content") != -1 or c.find("Legacy") != -1:
       continue
-    log_file.write("Processing %s\n" % c)
+    if log_file:
+      log_file.write("Processing %s\n" % c)
 
     # Objects of type
     # { Automattic: { http://automattic.com: [polldaddy.com] }}
@@ -129,38 +104,50 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
             d = d.encode('utf-8');
             canon_d = canonicalize(d);
             if (not canon_d in domain_dict) and (not d in allow_list):
-              log_file.write("[m] %s >> %s\n" % (d, canon_d));
-              log_file.write("[canonicalized] %s\n" % (canon_d));
-              log_file.write("[hash] %s\n" % hashlib.sha256(canon_d).hexdigest());
+              if log_file:
+                log_file.write("[m] %s >> %s\n" % (d, canon_d));
+                log_file.write("[canonicalized] %s\n" % (canon_d));
+                log_file.write("[hash] %s\n" % hashlib.sha256(canon_d).hexdigest());
               domain_dict[canon_d] = 1;
               hashdata_bytes += 32;
               output.append(hashlib.sha256(canon_d).digest());
 
   # Write safebrowsing-list format header
-  output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes));
+  if output_file:
+    output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes));
   output_string = "a:%u:32:%s\n" % (chunk, hashdata_bytes);
   for o in output:
-    output_file.write(o);
+    if output_file:
+      output_file.write(o);
     output_string = output_string + o
   return output_string
 
 
 def main():
-  args = parser.parse_args()
-  try:
-    disconnect_json = json.loads(urllib2.urlopen(args.disconnect_url).read())
-  except:
-    f_log.write("Error loading %s\n", args.disconnect_url)
+  config = ConfigParser.ConfigParser()
+  filename = config.read(["shavar_list_creation.ini"])
+  if not filename:
+    sys.stderr.write("Error loading shavar_list_creation.ini\n")
     sys.exit(-1)
 
-  output_file = open(args.output_file, "wb")
-  log_file = open(args.output_file + ".log", "w")
+  disconnect_url = config.get("ShavarListCreation", "disconnect_url")
+  try:
+    disconnect_json = json.loads(urllib2.urlopen(disconnect_url).read())
+  except:
+    sys.stderr.write("Error loading %s\n", disconnect_url)
+    sys.exit(-1)
+
+  output_filename = config.get("ShavarListCreation", "output_file")
+  if output_filename:
+    output_file = open(output_filename, "wb")
+    log_file = open(output_filename + ".log", "w")
   chunk = time.time()
 
   # load our allowlist
   allowed = set()
-  if args.allowlist_url:
-    for line in urllib2.urlopen(args.allowlist_url).readlines():
+  allowlist_url = config.get("ShavarListCreation", "allowlist_url")
+  if allowlist_url:
+    for line in urllib2.urlopen(allowlist_url).readlines():
       line = line.strip()
       # don't add blank lines or comments
       if not line or line.startswith('#'):
@@ -169,16 +156,23 @@ def main():
 
   output_string = find_hosts(disconnect_json, allowed, chunk, output_file, log_file)
 
-  output_file.close()
-  log_file.close()
+  if output_file:
+    output_file.close()
+  if log_file:
+    log_file.close()
 
-  # Optionally upload to S3. Both the S3 url and s3_upload arguments must be set.
-  if args.s3_upload and args.s3_url:
+  # Optionally upload to S3. If s3_upload is set, then s3_bucket and s3_key
+  # must be set.
+  if config.getboolean("ShavarListCreation", "s3_upload"):
+    bucket = config.get("ShavarListCreation", "s3_bucket")
+    key = config.get("ShavarListCreation", "s3_key")
+    if not bucket or not key:
+      sys.stderr.write("Can't upload to s3 without s3_bucket and s3_key\n")
+      sys.exit(-1)
+
     conn = boto.s3.connection.S3Connection()
-    url = urlparse.urlparse(args.s3_url)
-    bucket = conn.get_bucket(url.netloc)
     k = boto.s3.key.Key(bucket)
-    k.key = args.output_file
+    k.key = key
     k.set_contents_from_string(output_string)
     print "Uploaded to s3"
   else:
