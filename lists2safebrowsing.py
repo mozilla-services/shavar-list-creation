@@ -173,6 +173,7 @@ def main():
       sys.exit(-1)
 
     conn = boto.s3.connection.S3Connection()
+    bucket = conn.get_bucket(bucket)
     k = boto.s3.key.Key(bucket)
     k.key = key
     k.set_contents_from_string(output_string)
