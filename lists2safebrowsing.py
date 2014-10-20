@@ -137,6 +137,8 @@ def main():
     sys.stderr.write("Error loading %s\n", disconnect_url)
     sys.exit(-1)
 
+  output_file = None
+  log_file = None
   output_filename = config.get("ShavarListCreation", "output_file")
   if output_filename:
     output_file = open(output_filename, "wb")
