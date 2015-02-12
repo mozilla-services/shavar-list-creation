@@ -114,10 +114,8 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
 
   # Write safebrowsing-list format header
   if output_file:
-    output_file.write("ad:1-%u\n" % (chunk - 1))
-    output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
-  output_string = "ad:1-%u\n" % (chunk-1)
-  output_string = output_string + "a:%u:32:%s\n" % (chunk, hashdata_bytes);
+    output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes));
+  output_string = "a:%u:32:%s\n" % (chunk, hashdata_bytes);
   for o in output:
     if output_file:
       output_file.write(o);
