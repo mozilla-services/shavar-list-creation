@@ -103,7 +103,7 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
           for d in domains:
             d = d.encode('utf-8');
             canon_d = canonicalize(d);
-            if (not canon_d in domains) and (not d in allow_list):
+            if (not canon_d in domain_dict) and (not d in allow_list):
               if log_file:
                 log_file.write("[m] %s >> %s\n" % (d, canon_d));
                 log_file.write("[canonicalized] %s\n" % (canon_d));
