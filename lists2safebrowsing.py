@@ -234,8 +234,7 @@ def main():
       bucket = conn.get_bucket(bucket)
       k = boto.s3.key.Key(bucket)
       k.key = key
-      output_file.seek(0)
-      k.set_contents_from_file(output_file)
+      k.set_contents_from_filename(output_filename)
       print "Uploaded to s3"
   else:
     print "Skipping upload"
