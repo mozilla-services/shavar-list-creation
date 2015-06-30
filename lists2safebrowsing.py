@@ -73,6 +73,9 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
     output_file: A file-handle to the output file.
     log_file: A filehandle to the log file.
   """
+  # Number of items published
+  publishing = 0
+
   # Total number of bytes, 0 % 32
   hashdata_bytes = 0;
 
@@ -108,6 +111,7 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
                 log_file.write("[m] %s >> %s\n" % (d, canon_d));
                 log_file.write("[canonicalized] %s\n" % (canon_d));
                 log_file.write("[hash] %s\n" % hashlib.sha256(canon_d).hexdigest());
+              publishing += 1
               domain_dict[canon_d] = 1;
               hashdata_bytes += 32;
               output.append(hashlib.sha256(canon_d).digest());
@@ -120,27 +124,37 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
     if output_file:
       output_file.write(o);
     output_string = output_string + o
+
+  print "Tracking protection: publishing %d items; file size %d" \
+           % (publishing, len(output_string))
   return output_string
 
 def process_shumway(incoming, chunk, output_file, log_file):
-    domains = set()
-    hashdata_bytes = 0
-    output = []
-    for d in incoming:
-      canon_d = canonicalize(d.encode('utf-8'))
-      if canon_d not in domains:
-        h = hashlib.sha256(canon_d)
-        if log_file:
-          log_file.write("[shumway] %s >> (canonicalized) %s, hash %s\n"
-                         % (d, canon_d, h.hexdigest()))
-        domains.add(canon_d)
-        hashdata_bytes += 32
-        output.append(hashlib.sha256(canon_d).digest())
-    # Write the data file
-    output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
-    # FIXME: we should really sort the output
-    for o in output:
-      output_file.write(o)
+  publishing = 0
+  domains = set()
+  hashdata_bytes = 0
+  output = []
+  for d in incoming:
+    canon_d = canonicalize(d.encode('utf-8'))
+    if canon_d not in domains:
+      h = hashlib.sha256(canon_d)
+      if log_file:
+        log_file.write("[shumway] %s >> (canonicalized) %s, hash %s\n"
+                       % (d, canon_d, h.hexdigest()))
+      publishing += 1
+      domains.add(canon_d)
+      hashdata_bytes += 32
+      output.append(hashlib.sha256(canon_d).digest())
+  # Write the data file
+  output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
+  # FIXME: we should really sort the output
+  for o in output:
+    output_file.write(o)
+
+  output_file.flush()
+  output_size = os.fstat(output_file.fileno()).st_size
+  print "Shumway: publishing %d items; file size %d" \
+           % (publishing, output_size)
 
 def main():
   config = ConfigParser.ConfigParser()
@@ -235,6 +249,7 @@ def main():
         sys.stderr.write("Can't upload to s3 without s3_bucket and s3_key\n")
         sys.exit(-1)
 
+      output_filename = config.get(section, "output")
       conn = boto.s3.connection.S3Connection()
       bucket = conn.get_bucket(bucket)
       k = boto.s3.key.Key(bucket)
