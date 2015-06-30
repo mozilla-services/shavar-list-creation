@@ -205,6 +205,11 @@ def main():
 
       process_shumway(allowed, chunk, output_file, log_file)
 
+  if output_file:
+    output_file.close()
+  if log_file:
+    log_file.close()
+
   # Optionally upload to S3. If s3_upload is set, then s3_bucket and s3_key
   # must be set.
   if config.getboolean("main", "s3_upload"):
@@ -238,11 +243,6 @@ def main():
       print "Uploaded to s3"
   else:
     print "Skipping upload"
-
-  if output_file:
-    output_file.close()
-  if log_file:
-    log_file.close()
 
 if __name__ == "__main__":
   main()
