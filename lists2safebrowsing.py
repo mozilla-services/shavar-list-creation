@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 
 import ConfigParser
 import hashlib
@@ -73,6 +73,9 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
     output_file: A file-handle to the output file.
     log_file: A filehandle to the log file.
   """
+  # Number of items published
+  publishing = 0
+
   # Total number of bytes, 0 % 32
   hashdata_bytes = 0;
 
@@ -108,6 +111,7 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
                 log_file.write("[m] %s >> %s\n" % (d, canon_d));
                 log_file.write("[canonicalized] %s\n" % (canon_d));
                 log_file.write("[hash] %s\n" % hashlib.sha256(canon_d).hexdigest());
+              publishing += 1
               domain_dict[canon_d] = 1;
               hashdata_bytes += 32;
               output.append(hashlib.sha256(canon_d).digest());
@@ -120,8 +124,37 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
     if output_file:
       output_file.write(o);
     output_string = output_string + o
+
+  print "Tracking protection: publishing %d items; file size %d" \
+           % (publishing, len(output_string))
   return output_string
 
+def process_shumway(incoming, chunk, output_file, log_file):
+  publishing = 0
+  domains = set()
+  hashdata_bytes = 0
+  output = []
+  for d in incoming:
+    canon_d = canonicalize(d.encode('utf-8'))
+    if canon_d not in domains:
+      h = hashlib.sha256(canon_d)
+      if log_file:
+        log_file.write("[shumway] %s >> (canonicalized) %s, hash %s\n"
+                       % (d, canon_d, h.hexdigest()))
+      publishing += 1
+      domains.add(canon_d)
+      hashdata_bytes += 32
+      output.append(hashlib.sha256(canon_d).digest())
+  # Write the data file
+  output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
+  # FIXME: we should really sort the output
+  for o in output:
+    output_file.write(o)
+
+  output_file.flush()
+  output_size = os.fstat(output_file.fileno()).st_size
+  print "Shumway: publishing %d items; file size %d" \
+           % (publishing, output_size)
 
 def main():
   config = ConfigParser.ConfigParser()
@@ -130,33 +163,61 @@ def main():
     sys.stderr.write("Error loading shavar_list_creation.ini\n")
     sys.exit(-1)
 
-  disconnect_url = config.get("ShavarListCreation", "disconnect_url")
-  try:
-    disconnect_json = json.loads(urllib2.urlopen(disconnect_url).read())
-  except:
-    sys.stderr.write("Error loading %s\n", disconnect_url)
-    sys.exit(-1)
+  for section in config.sections():
+    if section == "main":
+      continue
 
-  output_file = None
-  log_file = None
-  output_filename = config.get("ShavarListCreation", "output_file")
-  if output_filename:
-    output_file = open(output_filename, "wb")
-    log_file = open(output_filename + ".log", "w")
-  chunk = time.time()
+    if section == "tracking-protection":
+      # process disconnect
+      disconnect_url = config.get(section, "disconnect_url")
+      try:
+        disconnect_json = json.loads(urllib2.urlopen(disconnect_url).read())
+      except:
+        sys.stderr.write("Error loading %s\n", disconnect_url)
+        sys.exit(-1)
 
-  # load our allowlist
-  allowed = set()
-  allowlist_url = config.get("ShavarListCreation", "allowlist_url")
-  if allowlist_url:
-    for line in urllib2.urlopen(allowlist_url).readlines():
-      line = line.strip()
-      # don't add blank lines or comments
-      if not line or line.startswith('#'):
-        continue
-      allowed.add(line)
+      output_file = None
+      log_file = None
+      output_filename = config.get(section, "output")
+      if output_filename:
+        output_file = open(output_filename, "wb")
+        log_file = open(output_filename + ".log", "w")
+      chunk = time.time()
 
-  output_string = find_hosts(disconnect_json, allowed, chunk, output_file, log_file)
+      # load our allowlist
+      allowed = set()
+      allowlist_url = config.get(section, "allowlist_url")
+      if allowlist_url:
+        for line in urllib2.urlopen(allowlist_url).readlines():
+          line = line.strip()
+          # don't add blank lines or comments
+          if not line or line.startswith('#'):
+            continue
+          allowed.add(line)
+
+      output_string = find_hosts(disconnect_json, allowed, chunk, output_file, log_file)
+
+    if section == "shumway":
+      output_file = None
+      log_file = None
+      output_filename = config.get(section, "output")
+      if output_filename:
+        output_file = open(output_filename, "wb")
+        log_file = open(output_filename + ".log", "w")
+      chunk = time.time()
+
+      # load our allowlist
+      allowed = set()
+      allowlist_url = config.get(section, "whitelist")
+      if allowlist_url:
+        for line in urllib2.urlopen(allowlist_url).readlines():
+          line = line.strip()
+          # don't add blank lines or comments
+          if not line or line.startswith('#'):
+            continue
+          allowed.add(line)
+
+      process_shumway(allowed, chunk, output_file, log_file)
 
   if output_file:
     output_file.close()
@@ -165,19 +226,36 @@ def main():
 
   # Optionally upload to S3. If s3_upload is set, then s3_bucket and s3_key
   # must be set.
-  if config.getboolean("ShavarListCreation", "s3_upload"):
-    bucket = config.get("ShavarListCreation", "s3_bucket")
-    key = config.get("ShavarListCreation", "s3_key")
-    if not bucket or not key:
-      sys.stderr.write("Can't upload to s3 without s3_bucket and s3_key\n")
-      sys.exit(-1)
+  if config.getboolean("main", "s3_upload"):
+    for section in config.sections():
+      if section == 'main':
+        continue
+      if (config.has_option(section, "s3_upload")
+            and not config.getboolean("s3_upload")):
+        print "Skipping S3 upload for %s" % section
+        continue
 
-    conn = boto.s3.connection.S3Connection()
-    bucket = conn.get_bucket(bucket)
-    k = boto.s3.key.Key(bucket)
-    k.key = key
-    k.set_contents_from_string(output_string)
-    print "Uploaded to s3"
+      bucket = config.get("main", "s3_bucket")
+      # Override with list specific bucket if necessary
+      if config.has_option(section, "s3_bucket"):
+        bucket = config.get(section, "s3_bucket")
+
+      key = config.get(section, os.path.basename("output"))
+      # Override with list specific value if necessary
+      if config.has_option(section, "s3_key"):
+        key = config.get(section, "s3_key")
+
+      if not bucket or not key:
+        sys.stderr.write("Can't upload to s3 without s3_bucket and s3_key\n")
+        sys.exit(-1)
+
+      output_filename = config.get(section, "output")
+      conn = boto.s3.connection.S3Connection()
+      bucket = conn.get_bucket(bucket)
+      k = boto.s3.key.Key(bucket)
+      k.key = key
+      k.set_contents_from_filename(output_filename)
+      print "Uploaded to s3"
   else:
     print "Skipping upload"
 
