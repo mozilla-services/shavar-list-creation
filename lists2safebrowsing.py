@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 import ConfigParser
 import hashlib
@@ -63,7 +63,8 @@ def canonicalize(d):
   # because safebrowsing lookups ignore it
   return host + "/" + _path;
 
-def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
+def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
+               add_content_category=False, name="prod"):
   """Finds hosts that we should block from the Disconnect json.
 
   Args:
@@ -89,8 +90,10 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
   categories = disconnect_json["categories"]
 
   for c in categories:
-    # Skip content and Legacy categories
-    if c.find("Content") != -1 or c.find("Legacy") != -1:
+    # Skip content and Legacy categories as necessary
+    if c.find("Legacy") != -1:
+      continue
+    if (c.find("Content") != -1 and not add_content_category):
       continue
     if log_file:
       log_file.write("Processing %s\n" % c)
@@ -125,9 +128,46 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file):
       output_file.write(o);
     output_string = output_string + o
 
-  print "Tracking protection: publishing %d items; file size %d" \
-           % (publishing, len(output_string))
+  print "Tracking protection(%s): publishing %d items; file size %d" \
+           % (name, publishing, len(output_string))
   return output_string
+
+def process_disconnect_entity_whitelist(incoming, chunk, output_file,
+                                        log_file):
+  """
+  Expects a dict from a loaded JSON blob.
+  """
+  publishing = 0
+  urls = set()
+  hashdata_bytes = 0
+  output = []
+  for name, entity in sorted(incoming.items()):
+    for prop in entity['properties']:
+      for res in entity['resources']:
+        prop = prop.encode('utf-8')
+        res = res.encode('utf-8')
+        if prop == res:
+          continue
+        d = canonicalize('%s/?resource=%s' % (prop, res))
+        h = hashlib.sha256(d)
+        if log_file:
+          log_file.write("[entity] %s >> (canonicalized) %s, hash %s\n"
+                         % (name, d, h.hexdigest()))
+        urls.add(d)
+        publishing += 1
+        hashdata_bytes += 32
+        output.append(hashlib.sha256(d).digest())
+
+  # Write the data file
+  output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
+  # FIXME: we should really sort the output
+  for o in output:
+    output_file.write(o)
+
+  output_file.flush()
+  output_size = os.fstat(output_file.fileno()).st_size
+  print "Entity whitelist: publishing %d items; file size %d" \
+           % (publishing, output_size)
 
 def process_shumway(incoming, chunk, output_file, log_file):
   publishing = 0
@@ -167,7 +207,7 @@ def main():
     if section == "main":
       continue
 
-    if section == "tracking-protection":
+    if section in ("tracking-protection", "tracking-protection-testing"):
       # process disconnect
       disconnect_url = config.get(section, "disconnect_url")
       try:
@@ -195,7 +235,14 @@ def main():
             continue
           allowed.add(line)
 
-      output_string = find_hosts(disconnect_json, allowed, chunk, output_file, log_file)
+      content_category=False
+      list_variant="prod"
+      if section == "tracking-protection-testing":
+        content_category=True
+        list_variant="testing"
+
+      find_hosts(disconnect_json, allowed, chunk, output_file, log_file,
+                 add_content_category=content_category, name=list_variant)
 
     if section == "shumway":
       output_file = None
@@ -219,6 +266,26 @@ def main():
 
       process_shumway(allowed, chunk, output_file, log_file)
 
+    if section == "entity-whitelist":
+      output_file = None
+      log_file = None
+      output_filename = config.get(section, "output")
+      if output_filename:
+        output_file = open(output_filename, "wb")
+        log_file = open(output_filename + ".log", "w")
+      chunk = time.time()
+
+      # download and load the business entity oriented whitelist
+      entity_url = config.get(section, "entity_url")
+      try:
+        disconnect_json = json.loads(urllib2.urlopen(entity_url).read())
+      except:
+        sys.stderr.write("Error loading %s\n", entity_url)
+        sys.exit(-1)
+
+      process_disconnect_entity_whitelist(disconnect_json, chunk, output_file,
+                                          log_file)
+ 
   if output_file:
     output_file.close()
   if log_file:
