@@ -133,7 +133,7 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
   return output_string
 
 def process_disconnect_entity_whitelist(incoming, chunk, output_file,
-                                        log_file):
+                                        log_file, list_variant):
   """
   Expects a dict from a loaded JSON blob.
   """
@@ -166,8 +166,8 @@ def process_disconnect_entity_whitelist(incoming, chunk, output_file,
 
   output_file.flush()
   output_size = os.fstat(output_file.fileno()).st_size
-  print "Entity whitelist: publishing %d items; file size %d" \
-           % (publishing, output_size)
+  print "Entity whitelist (%s): publishing %d items; file size %d" \
+           % (list_variant, publishing, output_size)
 
 def process_shumway(incoming, chunk, output_file, log_file):
   publishing = 0
@@ -268,7 +268,7 @@ def main():
 
       process_shumway(allowed, chunk, output_file, log_file)
 
-    if section == "entity-whitelist":
+    if section in ("entity-whitelist", "entity-whitelist-testing"):
       output_file = None
       log_file = None
       output_filename = config.get(section, "output")
@@ -285,9 +285,13 @@ def main():
         sys.stderr.write("Error loading %s\n", entity_url)
         sys.exit(-1)
 
+      list_variant="prod"
+      if section == "entity-whitelist-testing":
+        list_variant="testing"
+
       process_disconnect_entity_whitelist(disconnect_json, chunk, output_file,
-                                          log_file)
- 
+                                          log_file, list_variant)
+
   if output_file:
     output_file.close()
   if log_file:
