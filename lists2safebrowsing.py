@@ -207,7 +207,7 @@ def main():
     if section == "main":
       continue
 
-    if section in ("tracking-protection", "tracking-protection-testing"):
+    if section in ("tracking-protection", "tracking-protection-testing", "tracking-protection-abtest"):
       # process disconnect
       disconnect_url = config.get(section, "disconnect_url")
       try:
@@ -238,8 +238,10 @@ def main():
       content_category=False
       list_variant="prod"
       if section == "tracking-protection-testing":
-        content_category=True
         list_variant="testing"
+      elif section == "tracking-protection-abtest":
+        content_category=True
+        list_variant="abtest"
 
       find_hosts(disconnect_json, allowed, chunk, output_file, log_file,
                  add_content_category=content_category, name=list_variant)
