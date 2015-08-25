@@ -142,6 +142,7 @@ def process_disconnect_entity_whitelist(incoming, chunk, output_file,
   hashdata_bytes = 0
   output = []
   for name, entity in sorted(incoming.items()):
+    name = name.encode('utf-8')
     for prop in entity['properties']:
       for res in entity['resources']:
         prop = prop.encode('utf-8')
