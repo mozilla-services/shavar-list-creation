@@ -248,6 +248,8 @@ def main():
     sys.stderr.write("Error loading shavar_list_creation.ini\n")
     sys.exit(-1)
 
+  chunknum = int(time.time())
+
   for section in config.sections():
     if section == "main":
       continue
@@ -268,7 +270,6 @@ def main():
       if output_filename:
         output_file = open(output_filename, "wb")
         log_file = open(output_filename + ".log", "w")
-      chunk = time.time()
 
       # load our allowlist
       allowed = set()
@@ -289,7 +290,7 @@ def main():
         content_category=True
         list_variant="abtest"
 
-      find_hosts(disconnect_json, allowed, chunk, output_file, log_file,
+      find_hosts(disconnect_json, allowed, chunknum, output_file, log_file,
                  add_content_category=content_category, name=list_variant)
 
     if section == "shumway":
@@ -299,7 +300,6 @@ def main():
       if output_filename:
         output_file = open(output_filename, "wb")
         log_file = open(output_filename + ".log", "w")
-      chunk = time.time()
 
       # load our allowlist
       allowed = set()
@@ -312,7 +312,7 @@ def main():
             continue
           allowed.add(line)
 
-      process_shumway(allowed, chunk, output_file, log_file)
+      process_shumway(allowed, chunknum, output_file, log_file)
 
     if section in ("entity-whitelist", "entity-whitelist-testing"):
       output_file = None
@@ -335,8 +335,9 @@ def main():
       if section == "entity-whitelist-testing":
         list_variant="testing"
 
-      process_disconnect_entity_whitelist(disconnect_json, chunk, output_file,
-                                          log_file, list_variant)
+      process_disconnect_entity_whitelist(disconnect_json, chunknum,
+                                          output_file, log_file,
+                                          list_variant)
 
   if output_file:
     output_file.close()
@@ -369,6 +370,9 @@ def main():
     if config.has_option(section, "s3_key"):
       key = config.get(section, "s3_key")
 
+    chunk_key = os.path.join(config.get(section, os.path.basename('output')),
+                             str(chunknum))
+
     if not bucket or not key:
       sys.stderr.write("Can't upload to s3 without s3_bucket and s3_key\n")
       sys.exit(-1)
@@ -376,9 +380,10 @@ def main():
     output_filename = config.get(section, "output")
     conn = boto.s3.connection.S3Connection()
     bucket = conn.get_bucket(bucket)
-    k = boto.s3.key.Key(bucket)
-    k.key = key
-    k.set_contents_from_filename(output_filename)
+    for key_name in (chunk_key, key):
+      k = boto.s3.key.Key(bucket)
+      k.key = key_name
+      k.set_contents_from_filename(output_filename)
     print "Uploaded to s3: %s" % section
 
 
