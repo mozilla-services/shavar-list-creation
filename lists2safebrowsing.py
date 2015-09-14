@@ -6,6 +6,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import time
 import urllib2
 import urlparse
@@ -13,10 +14,10 @@ import urlparse
 import boto.s3.connection
 import boto.s3.key
 
-# bring a URL to canonical form as described at 
+# bring a URL to canonical form as described at
 # https://developers.google.com/safe-browsing/developers_guide_v2
 def canonicalize(d):
-  if (not d or d == ""): 
+  if (not d or d == ""):
     return d;
 
   # remove tab (0x09), CR (0x0d), LF (0x0a)
@@ -197,6 +198,49 @@ def process_shumway(incoming, chunk, output_file, log_file):
   print "Shumway: publishing %d items; file size %d" \
            % (publishing, output_size)
 
+def chunk_metadata(fp):
+  # Read the first 25 bytes and look for a new line.  Since this is a file
+  # formatted like a chunk, a end of the chunk header(a newline) should be
+  # found early.
+  header = fp.read(25)
+  eoh = header.find('\n')
+  chunktype, chunknum, hash_size, data_len = header[:eoh].split(':')
+  return dict(type=chunktype, num=chunknum, hash_size=hash_size, len=data_len,
+              checksum=hashlib.sha256(fp.read()).hexdigest())
+
+def new_data_to_publish(config, section, blob):
+  # Get the metadata for our old chunk
+
+  # If necessary, fetch the existing data from S3, otherwise open a local file
+  if ((config.has_option('main', 's3_upload')
+      and config.getboolean('main', 's3_upload'))
+       or (config.has_option(section, 's3_upload')
+           and config.getboolean(section, 's3_upload'))):
+    conn = boto.s3.connection.S3Connection()
+    bucket = conn.get_bucket(config.get('main', 's3_bucket'))
+    s3key = config.get(section, 's3_key') or config.get(section, 'output')
+    key = bucket.get_key(s3key)
+    if key is None:
+      # most likely a new list
+      print "{0} looks like it hasn't been uploaded to s3://{1}/{2}".format(section, bucket.name, s3key)
+      key = boto.s3.key.Key(bucket)
+      key.key = s3key
+      key.set_contents_from_string("a:1:32:32\n" + 32 * '1')
+    current = tempfile.TemporaryFile()
+    key.get_contents_to_file(current)
+    current.seek(0)
+  else:
+    current = open(config.get(section, 'output'), 'rb')
+
+  old = chunk_metadata(current)
+  current.close()
+
+  new = chunk_metadata(blob)
+
+  if old['checksum'] != new['checksum']:
+    return True
+  return False
+
 def main():
   config = ConfigParser.ConfigParser()
   filename = config.read(["shavar_list_creation.ini"])
@@ -204,11 +248,14 @@ def main():
     sys.stderr.write("Error loading shavar_list_creation.ini\n")
     sys.exit(-1)
 
+  chunknum = int(time.time())
+
   for section in config.sections():
     if section == "main":
       continue
 
-    if section in ("tracking-protection", "tracking-protection-testing", "tracking-protection-abtest"):
+    if section in ("tracking-protection", "tracking-protection-testing",
+                   "tracking-protection-abtest"):
       # process disconnect
       disconnect_url = config.get(section, "disconnect_url")
       try:
@@ -223,7 +270,6 @@ def main():
       if output_filename:
         output_file = open(output_filename, "wb")
         log_file = open(output_filename + ".log", "w")
-      chunk = time.time()
 
       # load our allowlist
       allowed = set()
@@ -244,7 +290,7 @@ def main():
         content_category=True
         list_variant="abtest"
 
-      find_hosts(disconnect_json, allowed, chunk, output_file, log_file,
+      find_hosts(disconnect_json, allowed, chunknum, output_file, log_file,
                  add_content_category=content_category, name=list_variant)
 
     if section == "shumway":
@@ -254,7 +300,6 @@ def main():
       if output_filename:
         output_file = open(output_filename, "wb")
         log_file = open(output_filename + ".log", "w")
-      chunk = time.time()
 
       # load our allowlist
       allowed = set()
@@ -267,7 +312,7 @@ def main():
             continue
           allowed.add(line)
 
-      process_shumway(allowed, chunk, output_file, log_file)
+      process_shumway(allowed, chunknum, output_file, log_file)
 
     if section in ("entity-whitelist", "entity-whitelist-testing"):
       output_file = None
@@ -290,8 +335,9 @@ def main():
       if section == "entity-whitelist-testing":
         list_variant="testing"
 
-      process_disconnect_entity_whitelist(disconnect_json, chunk, output_file,
-                                          log_file, list_variant)
+      process_disconnect_entity_whitelist(disconnect_json, chunknum,
+                                          output_file, log_file,
+                                          list_variant)
 
   if output_file:
     output_file.close()
@@ -300,38 +346,46 @@ def main():
 
   # Optionally upload to S3. If s3_upload is set, then s3_bucket and s3_key
   # must be set.
-  if config.getboolean("main", "s3_upload"):
-    for section in config.sections():
-      if section == 'main':
+  for section in config.sections():
+    if section == 'main':
+      continue
+
+    with open(config.get(section, 'output'), 'rb') as blob:
+      if not new_data_to_publish(config, section, blob):
+        print "No new data to publish for %s" % section
         continue
-      if (config.has_option(section, "s3_upload")
-            and not config.getboolean("s3_upload")):
-        print "Skipping S3 upload for %s" % section
-        continue
 
-      bucket = config.get("main", "s3_bucket")
-      # Override with list specific bucket if necessary
-      if config.has_option(section, "s3_bucket"):
-        bucket = config.get(section, "s3_bucket")
+    if (config.has_option(section, "s3_upload")
+        and not config.getboolean(section, "s3_upload")):
+      print "Skipping S3 upload for %s" % section
+      continue
 
-      key = config.get(section, os.path.basename("output"))
-      # Override with list specific value if necessary
-      if config.has_option(section, "s3_key"):
-        key = config.get(section, "s3_key")
+    bucket = config.get("main", "s3_bucket")
+    # Override with list specific bucket if necessary
+    if config.has_option(section, "s3_bucket"):
+      bucket = config.get(section, "s3_bucket")
 
-      if not bucket or not key:
-        sys.stderr.write("Can't upload to s3 without s3_bucket and s3_key\n")
-        sys.exit(-1)
+    key = os.path.basename(config.get(section, "output"))
+    # Override with list specific value if necessary
+    if config.has_option(section, "s3_key"):
+      key = config.get(section, "s3_key")
 
-      output_filename = config.get(section, "output")
-      conn = boto.s3.connection.S3Connection()
-      bucket = conn.get_bucket(bucket)
+    chunk_key = os.path.join(config.get(section, os.path.basename('output')),
+                             str(chunknum))
+
+    if not bucket or not key:
+      sys.stderr.write("Can't upload to s3 without s3_bucket and s3_key\n")
+      sys.exit(-1)
+
+    output_filename = config.get(section, "output")
+    conn = boto.s3.connection.S3Connection()
+    bucket = conn.get_bucket(bucket)
+    for key_name in (chunk_key, key):
       k = boto.s3.key.Key(bucket)
-      k.key = key
+      k.key = key_name
       k.set_contents_from_filename(output_filename)
-      print "Uploaded to s3"
-  else:
-    print "Skipping upload"
+    print "Uploaded to s3: %s" % section
+
 
 if __name__ == "__main__":
   main()
