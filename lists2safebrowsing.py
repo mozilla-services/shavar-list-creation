@@ -65,7 +65,7 @@ def canonicalize(d):
   return host + "/" + _path;
 
 def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
-               add_content_category=False, name="prod"):
+               add_content_category, name):
   """Finds hosts that we should block from the Disconnect json.
 
   Args:
@@ -255,7 +255,7 @@ def main():
       continue
 
     if section in ("tracking-protection", "tracking-protection-testing",
-                   "tracking-protection-abtest"):
+                   "tracking-protection-standard", "tracking-protection-full"):
       # process disconnect
       disconnect_url = config.get(section, "disconnect_url")
       try:
@@ -286,15 +286,17 @@ def main():
           allowed.add(line)
 
       content_category=False
-      list_variant="prod"
+      list_variant="std"
       if section == "tracking-protection-testing":
         list_variant="testing"
-      elif section == "tracking-protection-abtest":
+      elif section == "tracking-protection":
+        list_variant="legacy"
+      elif section == "tracking-protection-full":
         content_category=True
-        list_variant="abtest"
+        list_variant="full"
 
       find_hosts(disconnect_json, allowed, chunknum, output_file, log_file,
-                 add_content_category=content_category, name=list_variant)
+                 content_category, list_variant)
 
     if section == "shumway":
       output_file = None
@@ -334,7 +336,7 @@ def main():
         sys.stderr.write("Error loading %s\n", entity_url)
         sys.exit(-1)
 
-      list_variant="prod"
+      list_variant="std"
       if section == "entity-whitelist-testing":
         list_variant="testing"
 
