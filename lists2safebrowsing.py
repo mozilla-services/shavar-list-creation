@@ -273,7 +273,10 @@ def main():
 
       # load our allowlist
       allowed = set()
-      allowlist_url = config.get(section, "allowlist_url")
+      try:
+        allowlist_url = config.get(section, "allowlist_url")
+      except:
+        allowlist_url = None
       if allowlist_url:
         for line in urllib2.urlopen(allowlist_url).readlines():
           line = line.strip()
