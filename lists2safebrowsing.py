@@ -261,7 +261,7 @@ def main():
       try:
         disconnect_json = json.loads(urllib2.urlopen(disconnect_url).read())
       except:
-        sys.stderr.write("Error loading %s\n", disconnect_url)
+        sys.stderr.write("Error loading %s\n" % disconnect_url)
         sys.exit(-1)
 
       output_file = None
@@ -333,7 +333,7 @@ def main():
       try:
         disconnect_json = json.loads(urllib2.urlopen(entity_url).read())
       except:
-        sys.stderr.write("Error loading %s\n", entity_url)
+        sys.stderr.write("Error loading %s\n" % entity_url)
         sys.exit(-1)
 
       list_variant="std"
