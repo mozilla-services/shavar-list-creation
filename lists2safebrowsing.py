@@ -171,7 +171,7 @@ def process_disconnect_entity_whitelist(incoming, chunk, output_file,
   print "Entity whitelist (%s): publishing %d items; file size %d" \
            % (list_variant, publishing, output_size)
 
-def process_shumway(incoming, chunk, output_file, log_file):
+def process_plugin_blocklist(incoming, chunk, output_file, log_file):
   publishing = 0
   domains = set()
   hashdata_bytes = 0
@@ -181,7 +181,7 @@ def process_shumway(incoming, chunk, output_file, log_file):
     if canon_d not in domains:
       h = hashlib.sha256(canon_d)
       if log_file:
-        log_file.write("[shumway] %s >> (canonicalized) %s, hash %s\n"
+        log_file.write("[plugin-blocklist] %s >> (canonicalized) %s, hash %s\n"
                        % (d, canon_d, h.hexdigest()))
       publishing += 1
       domains.add(canon_d)
@@ -195,7 +195,7 @@ def process_shumway(incoming, chunk, output_file, log_file):
 
   output_file.flush()
   output_size = os.fstat(output_file.fileno()).st_size
-  print "Shumway: publishing %d items; file size %d" \
+  print "Plugin blocklist: publishing %d items; file size %d" \
            % (publishing, output_size)
 
 def chunk_metadata(fp):
@@ -298,7 +298,7 @@ def main():
       find_hosts(disconnect_json, allowed, chunknum, output_file, log_file,
                  content_category, list_variant)
 
-    if section == "shumway":
+    if section == "plugin-blocklist":
       output_file = None
       log_file = None
       output_filename = config.get(section, "output")
@@ -306,18 +306,18 @@ def main():
         output_file = open(output_filename, "wb")
         log_file = open(output_filename + ".log", "w")
 
-      # load our allowlist
-      allowed = set()
-      allowlist_url = config.get(section, "whitelist")
-      if allowlist_url:
-        for line in urllib2.urlopen(allowlist_url).readlines():
+      # load the plugin blocklist
+      blocked = set()
+      blocklist_url = config.get(section, "blocklist")
+      if blocklist_url:
+        for line in urllib2.urlopen(blocklist_url).readlines():
           line = line.strip()
           # don't add blank lines or comments
           if not line or line.startswith('#'):
             continue
-          allowed.add(line)
+          blocked.add(line)
 
-      process_shumway(allowed, chunknum, output_file, log_file)
+      process_plugin_blocklist(blocked, chunknum, output_file, log_file)
 
     if section in ("entity-whitelist", "entity-whitelist-testing"):
       output_file = None
