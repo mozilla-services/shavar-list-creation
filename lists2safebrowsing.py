@@ -255,7 +255,8 @@ def main():
       continue
 
     if section in ("tracking-protection", "tracking-protection-testing",
-                   "tracking-protection-standard", "tracking-protection-full"):
+                   "tracking-protection-standard", "tracking-protection-full",
+                   "staging-tracking-protection-standard", "staging-tracking-protection-full"):
       # process disconnect
       disconnect_url = config.get(section, "disconnect_url")
       try:
@@ -294,6 +295,11 @@ def main():
       elif section == "tracking-protection-full":
         content_category=True
         list_variant="full"
+      elif section == "staging-tracking-protection-standard":
+        list_variant="staging-std"
+      elif section == "staging-tracking-protection-full":
+        content_category=True
+        list_variant="staging-full"
 
       find_hosts(disconnect_json, allowed, chunknum, output_file, log_file,
                  content_category, list_variant)
@@ -319,7 +325,8 @@ def main():
 
       process_plugin_blocklist(blocked, chunknum, output_file, log_file)
 
-    if section in ("entity-whitelist", "entity-whitelist-testing"):
+    if section in ("entity-whitelist", "entity-whitelist-testing",
+                   "staging-entity-whitelist"):
       output_file = None
       log_file = None
       output_filename = config.get(section, "output")
@@ -339,6 +346,8 @@ def main():
       list_variant="std"
       if section == "entity-whitelist-testing":
         list_variant="testing"
+      elif section == "staging-entity-whitelist":
+        list_variant="staging"
 
       process_disconnect_entity_whitelist(disconnect_json, chunknum,
                                           output_file, log_file,
