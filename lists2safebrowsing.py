@@ -168,10 +168,11 @@ def process_disconnect_entity_whitelist(incoming, chunk, output_file,
 
   output_file.flush()
   output_size = os.fstat(output_file.fileno()).st_size
-  print "Entity whitelist (%s): publishing %d items; file size %d" \
+  print "Entity whitelist(%s): publishing %d items; file size %d" \
            % (list_variant, publishing, output_size)
 
-def process_plugin_blocklist(incoming, chunk, output_file, log_file):
+def process_plugin_blocklist(incoming, chunk, output_file, log_file,
+                             list_variant):
   publishing = 0
   domains = set()
   hashdata_bytes = 0
@@ -195,8 +196,8 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file):
 
   output_file.flush()
   output_size = os.fstat(output_file.fileno()).st_size
-  print "Plugin blocklist: publishing %d items; file size %d" \
-           % (publishing, output_size)
+  print "Plugin blocklist(%s): publishing %d items; file size %d" \
+           % (list_variant, publishing, output_size)
 
 def chunk_metadata(fp):
   # Read the first 25 bytes and look for a new line.  Since this is a file
@@ -304,7 +305,7 @@ def main():
       find_hosts(disconnect_json, allowed, chunknum, output_file, log_file,
                  content_category, list_variant)
 
-    if section == "plugin-blocklist":
+    if section in ("plugin-blocklist", "plugin-blocklist-experiment"):
       output_file = None
       log_file = None
       output_filename = config.get(section, "output")
@@ -323,7 +324,12 @@ def main():
             continue
           blocked.add(line)
 
-      process_plugin_blocklist(blocked, chunknum, output_file, log_file)
+      list_variant = "std"
+      if section == "plugin-blocklist-experiment":
+        list_variant = "experiment"
+
+      process_plugin_blocklist(blocked, chunknum, output_file, log_file,
+                               list_variant)
 
     if section in ("entity-whitelist", "entity-whitelist-testing",
                    "staging-entity-whitelist"):
