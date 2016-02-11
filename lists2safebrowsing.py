@@ -319,20 +319,20 @@ def main():
       if blocklist_url:
           [ this_type, input_file ] = urllib2.splittype(blocklist_url)
           if this_type == "file":
-              file = open(input_file, "r")
-              for line in file:
-                  line = line.strip()
-                  if not line or line.startswith('#'):
-                      continue
-                  blocked.add(line)
-              file.close()
+              try:
+                  blocklist_config = open(input_file, "r")
+              except:
+                  print "File cannot be opened: ", blocklist_config
+                  exit()
           else
-            for line in urllib2.urlopen(blocklist_url).readlines():
-              line = line.strip()
-              # don't add blank lines or comments
-              if not line or line.startswith('#'):
-                continue
-              blocked.add(line)
+              blocklist_config = urllib2.urlopen(blocklist_url).readlines()
+
+        for line in blocklist_config:
+          line = line.strip()
+          # don't add blank lines or comments
+          if not line or line.startswith('#'):
+            continue
+          blocked.add(line)
 
       list_variant = "std"
       if section == "plugin-blocklist-experiment":
