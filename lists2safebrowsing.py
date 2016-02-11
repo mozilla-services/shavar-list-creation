@@ -317,9 +317,9 @@ def main():
       blocked = set()
       blocklist_url = config.get(section, "blocklist")
       if blocklist_url:
-          [ this_type, this_url ] = urllib2.splittype(blocklist_url)
+          [ this_type, input_file ] = urllib2.splittype(blocklist_url)
           if this_type == "file":
-              file = open(this_url, "r")
+              file = open(input_file, "r")
               for line in file:
                   line = line.strip()
                   if not line or line.startswith('#'):
