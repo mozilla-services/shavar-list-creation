@@ -317,12 +317,22 @@ def main():
       blocked = set()
       blocklist_url = config.get(section, "blocklist")
       if blocklist_url:
-        for line in urllib2.urlopen(blocklist_url).readlines():
-          line = line.strip()
-          # don't add blank lines or comments
-          if not line or line.startswith('#'):
-            continue
-          blocked.add(line)
+          [ this_type, this_url ] = urllib2.splittype(blocklist_url)
+          if this_type == "file":
+              file = open(this_url, "r")
+              for line in file:
+                  line = line.strip()
+                  if not line or line.startswith('#'):
+                      continue
+                  blocked.add(line)
+              file.close()
+          else
+            for line in urllib2.urlopen(blocklist_url).readlines():
+              line = line.strip()
+              # don't add blank lines or comments
+              if not line or line.startswith('#'):
+                continue
+              blocked.add(line)
 
       list_variant = "std"
       if section == "plugin-blocklist-experiment":
