@@ -9,18 +9,18 @@ import sys
 import tempfile
 import time
 import urllib2
-import urlparse
 
 import boto.s3.connection
 import boto.s3.key
 
 # bring a URL to canonical form as described at
-# https://developers.google.com/safe-browsing/developers_guide_v2
+# https://web.archive.org/web/20160422212049/https://developers.google.com/safe-browsing/developers_guide_v2#Canonicalization
 def canonicalize(d):
   if (not d or d == ""):
     return d;
 
   # remove tab (0x09), CR (0x0d), LF (0x0a)
+  # TODO?: d, _subs_made = re.subn("\t|\r|\n", "", d)
   d = re.subn("\t|\r|\n", "", d)[0];
 
   # remove any URL fragment
@@ -38,6 +38,7 @@ def canonicalize(d):
 
   # extract hostname (scheme://)(username(:password)@)hostname(:port)(/...)
   # extract path
+  # TODO?: use urlparse ?
   url_components = re.match(
     re.compile(
       "^(?:[a-z]+\:\/\/)?(?:[a-z]+(?:\:[a-z0-9]+)?@)?([^\/^\?^\:]+)(?:\:[0-9]+)?(\/(.*)|$)"), d);
@@ -46,8 +47,10 @@ def canonicalize(d):
   path = re.subn("^(\/)+", "", path)[0];
 
   # remove leading and trailing dots
+  # TODO?: host, _subs_made = re.subn("^\.+|\.+$", "", host)
   host = re.subn("^\.+|\.+$", "", host)[0];
   # replace consequtive dots with a single dot
+  # TODO?: host, _subs_made = re.subn("\.+", ".", host)
   host = re.subn("\.+", ".", host)[0];
   # lowercase the whole thing
   host = host.lower();
@@ -64,6 +67,7 @@ def canonicalize(d):
   # because safebrowsing lookups ignore it
   return host + "/" + _path;
 
+# TODO?: rename find_tracking_hosts
 def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
                add_content_category, name):
   """Finds hosts that we should block from the Disconnect json.
@@ -82,6 +86,7 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
   hashdata_bytes = 0;
 
   # Remember previously-processed domains so we don't print them more than once
+  # TODO?: domain_dict = []
   domain_dict = {};
 
   # Array holding hash bytes to be written to f_out. We need the total bytes
@@ -117,6 +122,7 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
                 log_file.write("[hash] %s\n" % hashlib.sha256(canon_d).hexdigest());
               publishing += 1
               domain_dict[canon_d] = 1;
+              # TODO?: hashdata_bytes += hashdata.digest_size
               hashdata_bytes += 32;
               output.append(hashlib.sha256(canon_d).digest());
 
@@ -279,6 +285,7 @@ def main():
         allowlist_url = config.get(section, "allowlist_url")
       except:
         allowlist_url = None
+      # TODO: refactor into: def get_allowed_domains(allowlist_url)
       if allowlist_url:
         for line in urllib2.urlopen(allowlist_url).readlines():
           line = line.strip()
