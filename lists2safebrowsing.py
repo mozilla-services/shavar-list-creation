@@ -13,6 +13,25 @@ import urllib2
 import boto.s3.connection
 import boto.s3.key
 
+
+def get_output_and_log_files(config, section):
+    output_file = None
+    log_file = None
+    output_filename = config.get(section, "output")
+    if output_filename:
+        output_file = open(output_filename, "wb")
+        log_file = open(output_filename + ".log", "w")
+    return output_file, log_file
+
+def load_json_from_url(config, section, key):
+    url = config.get(section, key)
+    try:
+        loaded_json = json.loads(urllib2.urlopen(url).read())
+    except:
+        sys.stderr.write("Error loading %s\n" % url)
+        sys.exit(-1)
+    return loaded_json
+
 # bring a URL to canonical form as described at
 # https://web.archive.org/web/20160422212049/https://developers.google.com/safe-browsing/developers_guide_v2#Canonicalization
 def canonicalize(d):
@@ -265,19 +284,9 @@ def main():
                    "tracking-protection-standard", "tracking-protection-full",
                    "staging-tracking-protection-standard", "staging-tracking-protection-full"):
       # process disconnect
-      disconnect_url = config.get(section, "disconnect_url")
-      try:
-        disconnect_json = json.loads(urllib2.urlopen(disconnect_url).read())
-      except:
-        sys.stderr.write("Error loading %s\n" % disconnect_url)
-        sys.exit(-1)
+      disconnect_json = load_json_from_url(config, section, "disconnect_url")
 
-      output_file = None
-      log_file = None
-      output_filename = config.get(section, "output")
-      if output_filename:
-        output_file = open(output_filename, "wb")
-        log_file = open(output_filename + ".log", "w")
+      output_file, log_file = get_output_and_log_files(config, section)
 
       # load our allowlist
       allowed = set()
@@ -313,12 +322,7 @@ def main():
                  content_category, list_variant)
 
     if section in ("plugin-blocklist", "plugin-blocklist-experiment"):
-      output_file = None
-      log_file = None
-      output_filename = config.get(section, "output")
-      if output_filename:
-        output_file = open(output_filename, "wb")
-        log_file = open(output_filename + ".log", "w")
+      output_file, log_file = get_output_and_log_files(config, section)
 
       # load the plugin blocklist
       blocked = set()
@@ -340,21 +344,10 @@ def main():
 
     if section in ("entity-whitelist", "entity-whitelist-testing",
                    "staging-entity-whitelist"):
-      output_file = None
-      log_file = None
-      output_filename = config.get(section, "output")
-      if output_filename:
-        output_file = open(output_filename, "wb")
-        log_file = open(output_filename + ".log", "w")
-      chunk = time.time()
+      output_file, log_file = get_output_and_log_files(config, section)
 
       # download and load the business entity oriented whitelist
-      entity_url = config.get(section, "entity_url")
-      try:
-        disconnect_json = json.loads(urllib2.urlopen(entity_url).read())
-      except:
-        sys.stderr.write("Error loading %s\n" % entity_url)
-        sys.exit(-1)
+      disconnect_json = load_json_from_url(config, section, "entity_url")
 
       list_variant="std"
       if section == "entity-whitelist-testing":
