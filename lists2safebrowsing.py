@@ -49,6 +49,18 @@ DNT_CONTENT_SECTIONS = (
     "tracking-protection-contenteff",
     "tracking-protection-contentw3c"
 )
+DNT_BLANK_SECTIONS = (
+    "tracking-protection-base",
+    "tracking-protection-content",
+)
+DNT_EFF_SECTIONS = (
+    "tracking-protection-baseeff",
+    "tracking-protection-contenteff",
+)
+DNT_W3C_SECTIONS = (
+    "tracking-protection-basew3c",
+    "tracking-protection-contentw3c"
+)
 
 
 def get_output_and_log_files(config, section):
@@ -128,7 +140,7 @@ def canonicalize(d):
 
 # TODO?: rename find_tracking_hosts
 def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
-               add_content_category, name):
+               which_dnt, add_content_category, name):
   """Finds hosts that we should block from the Disconnect json.
 
   Args:
@@ -168,9 +180,13 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
     # Domain lists may or may not contain the address of the top-level site.
     for org in categories[c]:
       for orgname in org:
-        top_domains = org[orgname]
-        for top in top_domains:
-          domains = top_domains[top]
+        org_json = org[orgname]
+        dnt_value = org_json.pop('dnt', '')
+        assert dnt_value in ["w3c", "eff", ""]
+        if dnt_value != which_dnt:
+            continue
+        for top in org_json:
+          domains = org_json[top]
           for d in domains:
             d = d.encode('utf-8');
             canon_d = canonicalize(d);
@@ -346,8 +362,15 @@ def main():
           section in DNT_CONTENT_SECTIONS):
           content_category = True
 
+      if section in DNT_EFF_SECTIONS:
+          which_dnt = "eff"
+      elif section in DNT_W3C_SECTIONS:
+          which_dnt = "w3c"
+      else:
+          which_dnt = ""
+
       find_hosts(disconnect_json, allowed, chunknum, output_file, log_file,
-                 content_category, section)
+                 which_dnt, content_category, section)
 
     if section in PLUGIN_SECTIONS:
       output_file, log_file = get_output_and_log_files(config, section)
