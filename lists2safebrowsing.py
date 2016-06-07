@@ -14,6 +14,43 @@ import boto.s3.connection
 import boto.s3.key
 
 
+PLUGIN_SECTIONS = (
+    "plugin-blocklist",
+    "plugin-blocklist-experiment"
+)
+WHITELIST_SECTIONS = (
+    "entity-whitelist",
+    "entity-whitelist-testing",
+    "staging-entity-whitelist"
+)
+PRE_DNT_SECTIONS = (
+    "tracking-protection",
+    "tracking-protection-testing",
+    "tracking-protection-standard",
+    "tracking-protection-full",
+    "staging-tracking-protection-standard",
+    "staging-tracking-protection-full"
+)
+PRE_DNT_CONTENT_SECTIONS = (
+    "tracking-protection-full",
+    "staging-tracking-protection-full"
+)
+
+DNT_SECTIONS = (
+    "tracking-protection-base",
+    "tracking-protection-baseeff",
+    "tracking-protection-basew3c",
+    "tracking-protection-content",
+    "tracking-protection-contenteff",
+    "tracking-protection-contentw3c"
+)
+DNT_CONTENT_SECTIONS = (
+    "tracking-protection-content",
+    "tracking-protection-contenteff",
+    "tracking-protection-contentw3c"
+)
+
+
 def get_output_and_log_files(config, section):
     output_file = None
     log_file = None
@@ -23,6 +60,7 @@ def get_output_and_log_files(config, section):
         log_file = open(output_filename + ".log", "w")
     return output_file, log_file
 
+
 def load_json_from_url(config, section, key):
     url = config.get(section, key)
     try:
@@ -31,6 +69,7 @@ def load_json_from_url(config, section, key):
         sys.stderr.write("Error loading %s\n" % url)
         sys.exit(-1)
     return loaded_json
+
 
 # bring a URL to canonical form as described at
 # https://web.archive.org/web/20160422212049/https://developers.google.com/safe-browsing/developers_guide_v2#Canonicalization
@@ -85,6 +124,7 @@ def canonicalize(d):
   # Note: we do NOT append the scheme
   # because safebrowsing lookups ignore it
   return host + "/" + _path;
+
 
 # TODO?: rename find_tracking_hosts
 def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
@@ -280,9 +320,7 @@ def main():
     if section == "main":
       continue
 
-    if section in ("tracking-protection", "tracking-protection-testing",
-                   "tracking-protection-standard", "tracking-protection-full",
-                   "staging-tracking-protection-standard", "staging-tracking-protection-full"):
+    if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
       # process disconnect
       disconnect_json = load_json_from_url(config, section, "disconnect_url")
 
@@ -304,24 +342,14 @@ def main():
           allowed.add(line)
 
       content_category=False
-      list_variant="std"
-      if section == "tracking-protection-testing":
-        list_variant="testing"
-      elif section == "tracking-protection":
-        list_variant="legacy"
-      elif section == "tracking-protection-full":
-        content_category=True
-        list_variant="full"
-      elif section == "staging-tracking-protection-standard":
-        list_variant="staging-std"
-      elif section == "staging-tracking-protection-full":
-        content_category=True
-        list_variant="staging-full"
+      if (section in PRE_DNT_CONTENT_SECTIONS or
+          section in DNT_CONTENT_SECTIONS):
+          content_category = True
 
       find_hosts(disconnect_json, allowed, chunknum, output_file, log_file,
-                 content_category, list_variant)
+                 content_category, section)
 
-    if section in ("plugin-blocklist", "plugin-blocklist-experiment"):
+    if section in PLUGIN_SECTIONS:
       output_file, log_file = get_output_and_log_files(config, section)
 
       # load the plugin blocklist
@@ -335,29 +363,18 @@ def main():
             continue
           blocked.add(line)
 
-      list_variant = "std"
-      if section == "plugin-blocklist-experiment":
-        list_variant = "experiment"
-
       process_plugin_blocklist(blocked, chunknum, output_file, log_file,
-                               list_variant)
+                               section)
 
-    if section in ("entity-whitelist", "entity-whitelist-testing",
-                   "staging-entity-whitelist"):
+    if section in WHITELIST_SECTIONS:
       output_file, log_file = get_output_and_log_files(config, section)
 
       # download and load the business entity oriented whitelist
       disconnect_json = load_json_from_url(config, section, "entity_url")
 
-      list_variant="std"
-      if section == "entity-whitelist-testing":
-        list_variant="testing"
-      elif section == "staging-entity-whitelist":
-        list_variant="staging"
-
       process_disconnect_entity_whitelist(disconnect_json, chunknum,
                                           output_file, log_file,
-                                          list_variant)
+                                          section)
 
   if output_file:
     output_file.close()
