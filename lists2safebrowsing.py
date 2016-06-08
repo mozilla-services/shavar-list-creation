@@ -140,7 +140,7 @@ def canonicalize(d):
 
 # TODO?: rename find_tracking_hosts
 def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
-               which_dnt, add_content_category, name):
+               which_dnt, content_category, name):
   """Finds hosts that we should block from the Disconnect json.
 
   Args:
@@ -167,11 +167,20 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
   categories = disconnect_json["categories"]
 
   for c in categories:
+    in_content_category = c.find("Content") != -1
+    if content_category == 'ONLY' and not in_content_category:
+      # If we're ONLY including the content category and this is NOT it,
+      # we can continue to the next category
+      continue
     # Skip content and Legacy categories as necessary
     if c.find("Legacy") != -1:
       continue
-    if (c.find("Content") != -1 and not add_content_category):
-      continue
+    if in_content_category:
+      if content_category == 'ONLY':
+        # Reset output to only include content
+        output = []
+      if content_category == 'SKIP':
+        continue
     if log_file:
       log_file.write("Processing %s\n" % c)
 
@@ -200,6 +209,7 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
               # TODO?: hashdata_bytes += hashdata.digest_size
               hashdata_bytes += 32;
               output.append(hashlib.sha256(canon_d).digest());
+
 
   # Write safebrowsing-list format header
   if output_file:
@@ -357,10 +367,11 @@ def main():
             continue
           allowed.add(line)
 
-      content_category=False
-      if (section in PRE_DNT_CONTENT_SECTIONS or
-          section in DNT_CONTENT_SECTIONS):
-          content_category = True
+      content_category = "SKIP"
+      if section in PRE_DNT_CONTENT_SECTIONS:
+          content_category = "INCLUDE"
+      if section in DNT_CONTENT_SECTIONS:
+          content_category = "ONLY"
 
       if section in DNT_EFF_SECTIONS:
           which_dnt = "eff"
