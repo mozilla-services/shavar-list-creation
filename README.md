@@ -1,14 +1,22 @@
 shavar-list-creation
 ====================
-    usage: lists2safebrowsing.py
+This script fetches blocklist `.json` from urls (such as
+[shavar-prod-lists](https://github.com/mozilla-services/shavar-prod-lists)) and
+generates safebrowsing-compatible digest list files to be served by
+[shavar](https://github.com/mozilla-services/shavar).
 
-A shavar.ini file must exist in the same directory that specifies the following parameters. See sample_shavar_list_creation.ini for examples.
+# Requirements
+A `shavar_list_creation.ini` file must exist in the same directory that specifies the following parameters. (See `sample_shavar_list_creation.ini` for an example.)
 
-Commits to shavar-list-exceptions trigger rebuilds of shavar-list-creation like so:
+# Run
+```
+./lists2safebrowsing.py
+```
 
-1. A commit is made to https://github.com/mozilla-services/shavar-list-exceptions
-2. That commit triggers a Jenkins workflow that will pull down the current exception list
-3. Jenkins then pulls down the master codebase from https://github.com/mozilla-services/shavar-list-creation and builds the list
-4. The completed list is placed in the s3 bucket for production
+# Usage
+This is run by a Jenkins deployment job every 30 minutes that:
 
-This job does not run on a cron. This is OK so long as we're not publishing true incremental updates.
+1. Checks out this repository
+2. Checks out the [shavar-list-creation-config](https://github.com/mozilla-services/shavar-list-creation-config/) repository
+3. Copies `stage.ini` or `prod.ini` to `shavar_list_creation.ini`
+4. Runs `python lists2safebrowsing.py`, which uploads updated safebrowsing list files to S3 for [shavar](https://github.com/mozilla-services/shavar).
