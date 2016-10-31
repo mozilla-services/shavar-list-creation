@@ -210,6 +210,8 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
               # SafeBrowsing keeps trailing '/', PublicSuffix does not
               psl_d = canon_d.rstrip('/')
               if psl.publicsuffix(psl_d) == psl_d:
+                if log_file:
+                  log_file.write("[Public Suffix] %s; Skipping.\n" % psl_d)
                 continue
               if log_file:
                 log_file.write("[m] %s >> %s\n" % (d, canon_d));
