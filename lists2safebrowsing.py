@@ -13,6 +13,12 @@ import urllib2
 import boto.s3.connection
 import boto.s3.key
 
+from publicsuffixlist import PublicSuffixList
+from publicsuffixlist.update import updatePSL
+
+
+updatePSL()
+psl = PublicSuffixList()
 
 PLUGIN_SECTIONS = (
     "plugin-blocklist",
@@ -200,6 +206,13 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
             d = d.encode('utf-8');
             canon_d = canonicalize(d);
             if (not canon_d in domain_dict) and (not d in allow_list):
+              # check if the domain is in the public suffix list
+              # SafeBrowsing keeps trailing '/', PublicSuffix does not
+              psl_d = canon_d.rstrip('/')
+              if psl.publicsuffix(psl_d) == psl_d:
+                if log_file:
+                  log_file.write("[Public Suffix] %s; Skipping.\n" % psl_d)
+                continue
               if log_file:
                 log_file.write("[m] %s >> %s\n" % (d, canon_d));
                 log_file.write("[canonicalized] %s\n" % (canon_d));
