@@ -17,8 +17,15 @@ from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
 
 
-updatePSL()
-psl = PublicSuffixList()
+try:
+    updatePSL()
+except:
+    print "Could not download PSL dat file"
+
+try:
+    psl = PublicSuffixList()
+except:
+    psl = list()
 
 PLUGIN_SECTIONS = (
     "plugin-blocklist",
