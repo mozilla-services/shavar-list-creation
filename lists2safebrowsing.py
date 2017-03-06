@@ -22,7 +22,13 @@ psl = PublicSuffixList()
 
 PLUGIN_SECTIONS = (
     "plugin-blocklist",
-    "plugin-blocklist-experiment"
+    "plugin-blocklist-experiment",
+    "flash-blocklist",
+    "flash-exceptions",
+    "flash-allow",
+    "flash-allow-exceptions",
+    "flash-subdoc",
+    "flash-subdoc-exceptions"
 )
 WHITELIST_SECTIONS = (
     "entity-whitelist",
