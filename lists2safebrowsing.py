@@ -409,7 +409,17 @@ def main():
       blocked = set()
       blocklist_url = config.get(section, "blocklist")
       if blocklist_url:
-        for line in urllib2.urlopen(blocklist_url).readlines():
+          [ this_type, input_file ] = urllib2.splittype(blocklist_url)
+          if this_type == "file":
+              try:
+                  blocklist_config = open(input_file, "r")
+              except:
+                  print "File cannot be opened: ", blocklist_config
+                  exit()
+          else
+              blocklist_config = urllib2.urlopen(blocklist_url).readlines()
+
+        for line in blocklist_config:
           line = line.strip()
           # don't add blank lines or comments
           if not line or line.startswith('#'):
