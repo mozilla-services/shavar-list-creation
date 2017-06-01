@@ -28,7 +28,8 @@ PLUGIN_SECTIONS = (
     "flash-allow",
     "flash-allow-exceptions",
     "flash-subdoc",
-    "flash-subdoc-exceptions"
+    "flash-subdoc-exceptions",
+    "infobar-exceptions"
 )
 WHITELIST_SECTIONS = (
     "entity-whitelist",
