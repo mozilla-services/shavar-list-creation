@@ -55,7 +55,10 @@ DNT_SECTIONS = (
     "tracking-protection-basew3c",
     "tracking-protection-content",
     "tracking-protection-contenteff",
-    "tracking-protection-contentw3c"
+    "tracking-protection-contentw3c",
+    "tracking-protection-ads",
+    "tracking-protection-analytics",
+    "tracking-protection-social",
 )
 DNT_CONTENT_SECTIONS = (
     "tracking-protection-content",
