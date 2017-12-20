@@ -90,7 +90,10 @@ def get_output_and_log_files(config, section):
 
 
 def load_json_from_url(config, section, key):
-    url = config.get(section, key)
+    try:
+        url = config.get(section, key)
+    except ConfigParser.NoOptionError:
+        url = config.get("main", "default_disconnect_url")
     try:
         loaded_json = json.loads(urllib2.urlopen(url).read())
     except:
