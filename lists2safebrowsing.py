@@ -78,6 +78,8 @@ DNT_W3C_SECTIONS = (
     "tracking-protection-contentw3c"
 )
 
+DEFAULT_DISCONNECT_LIST_CATEGORIES = 'Advertising,Analytics,Social,Disconnect'
+
 
 def get_output_and_log_files(config, section):
     output_file = None
@@ -390,7 +392,10 @@ def main():
             continue
           allowed.add(line)
 
-      list_categories = config.get(section, "disconnect_categories")
+      try:
+        list_categories = config.get(section, "disconnect_categories")
+      except ConfigParser.NoOptionError:
+        list_categories = DEFAULT_DISCONNECT_LIST_CATEGORIES
 
       if section in DNT_EFF_SECTIONS:
           which_dnt = "eff"
