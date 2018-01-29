@@ -55,7 +55,10 @@ DNT_SECTIONS = (
     "tracking-protection-basew3c",
     "tracking-protection-content",
     "tracking-protection-contenteff",
-    "tracking-protection-contentw3c"
+    "tracking-protection-contentw3c",
+    "tracking-protection-ads",
+    "tracking-protection-analytics",
+    "tracking-protection-social",
 )
 DNT_CONTENT_SECTIONS = (
     "tracking-protection-content",
@@ -87,7 +90,10 @@ def get_output_and_log_files(config, section):
 
 
 def load_json_from_url(config, section, key):
-    url = config.get(section, key)
+    try:
+        url = config.get(section, key)
+    except ConfigParser.NoOptionError:
+        url = config.get("main", "default_disconnect_url")
     try:
         loaded_json = json.loads(urllib2.urlopen(url).read())
     except:
@@ -153,7 +159,7 @@ def canonicalize(d):
 
 # TODO?: rename find_tracking_hosts
 def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
-               which_dnt, content_category, name):
+               which_dnt, list_categories, name):
   """Finds hosts that we should block from the Disconnect json.
 
   Args:
@@ -180,20 +186,17 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
   categories = disconnect_json["categories"]
 
   for c in categories:
-    in_content_category = c.find("Content") != -1
-    if content_category == 'ONLY' and not in_content_category:
-      # If we're ONLY including the content category and this is NOT it,
-      # we can continue to the next category
+    add_category_to_list = False
+    for lc in list_categories.split(","):
+      if c.find(lc) != -1:
+          add_category_to_list = True
+    if not add_category_to_list:
       continue
-    # Skip content and Legacy categories as necessary
-    if c.find("Legacy") != -1:
-      continue
-    if in_content_category:
-      if content_category == 'ONLY':
-        # Reset output to only include content
+    if add_category_to_list:
+      # Is this list a single-category list?
+      if len(list_categories) == 1:
+        # Reset output to only include this category's content
         output = []
-      if content_category == 'SKIP':
-        continue
     if log_file:
       log_file.write("Processing %s\n" % c)
 
@@ -387,11 +390,7 @@ def main():
             continue
           allowed.add(line)
 
-      content_category = "SKIP"
-      if section in PRE_DNT_CONTENT_SECTIONS:
-          content_category = "INCLUDE"
-      if section in DNT_CONTENT_SECTIONS:
-          content_category = "ONLY"
+      list_categories = config.get(section, "disconnect_categories")
 
       if section in DNT_EFF_SECTIONS:
           which_dnt = "eff"
@@ -401,7 +400,7 @@ def main():
           which_dnt = ""
 
       find_hosts(disconnect_json, allowed, chunknum, output_file, log_file,
-                 which_dnt, content_category, section)
+                 which_dnt, list_categories, section)
 
     if section in PLUGIN_SECTIONS:
       output_file, log_file = get_output_and_log_files(config, section)
