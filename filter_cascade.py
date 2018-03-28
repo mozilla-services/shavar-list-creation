@@ -65,3 +65,15 @@ class FilterCascade:
             return 1
         else:
             return self.childLayer.layerCount() + 1
+
+    def tofile(self, f):
+        """
+        Write the bloom filter to file object 'f'
+        by calling tofile for each layer of the Filter Cascade.
+        """
+        self.filter.tofile(f)
+        if self.childLayer is None:
+            print("we're at the bottom of the cascade!"
+                  "No need to write any more")
+        else:
+            self.childLayer.tofile(f)

@@ -46,4 +46,4 @@ print("This filter cascade uses %d layers and %d bits" % (
 )
 print("Writing to file %s" % MLBF_FILENAME)
 
-cascade.filter.tofile(open(MLBF_FILENAME, 'w'))
+cascade.tofile(open(MLBF_FILENAME, 'w'))
