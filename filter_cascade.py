@@ -1,3 +1,5 @@
+from struct import pack
+
 from pybloom import BloomFilter
 
 
@@ -13,8 +15,12 @@ class FilterCascade:
         self.childLayer = None
         self.depth = depth
         self.oversize_factor = oversize_factor
+        self.salt = None
 
     def initialize(self, entries, exclusions):
+        # set the "salt" for this layer
+        self.salt = "a" * self.depth
+
         # loop over the elements that should be there. Add them to the filter.
         for elem in entries:
             self.filter.add(elem)
@@ -36,8 +42,8 @@ class FilterCascade:
                               )
             # salt entries in some variable but deterministic way
             self.childLayer.initialize(
-                [pos + "a" * self.depth for pos in falsePositives],
-                [pos + "a" * self.depth for pos in entries]
+                [pos + self.salt for pos in falsePositives],
+                [pos + self.salt for pos in entries]
             )
 
     def __contains__(self, elem):
@@ -71,6 +77,7 @@ class FilterCascade:
         Write the bloom filter to file object 'f'
         by calling tofile for each layer of the Filter Cascade.
         """
+        f.write(pack('s', self.salt))
         self.filter.tofile(f)
         if self.childLayer is None:
             print("we're at the bottom of the cascade!"
