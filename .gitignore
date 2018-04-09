@@ -1,4 +1,4 @@
 /shavar_list_creation.ini
 *.log
 *-digest256
-*-mlbf
+*-mlbf-*

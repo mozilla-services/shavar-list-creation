@@ -77,7 +77,10 @@ class FilterCascade:
         Write the bloom filter to file object 'f'
         by calling tofile for each layer of the Filter Cascade.
         """
+        # print("Writing salt: %s" % self.salt)
         f.write(pack('s', self.salt))
+        # print("Writing filter: %s" % self.filter.__dict__)
+        f.write(pack('s', self.filter.hashfn_name))
         self.filter.tofile(f)
         if self.childLayer is None:
             print("we're at the bottom of the cascade!"
