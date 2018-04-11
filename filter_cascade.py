@@ -83,7 +83,7 @@ class FilterCascade:
         f.write(pack('s', self.filter.hashfn_name))
         self.filter.tofile(f)
         if self.childLayer is None:
-            print("we're at the bottom of the cascade!"
+            print("we're at the bottom of the cascade!\n"
                   "No need to write any more")
         else:
             self.childLayer.tofile(f)
