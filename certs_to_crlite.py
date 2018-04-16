@@ -14,6 +14,8 @@ import censys.certificates
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from decouple import config
+import OpenSSL
+import requests
 
 # Local modules
 from filter_cascade import FilterCascade
@@ -219,6 +221,7 @@ def processCTData(path):
         counter["Folders Up-to-date"] += 1
 
 
+"""
 CENSYS_API_UID = config("CENSYS_API_UID", None)
 CENSYS_API_SECRET = config("CENSYS_API_SECRET", None)
 
@@ -230,7 +233,6 @@ certificates = censys.certificates.CensysCertificates(
     CENSYS_API_UID, CENSYS_API_SECRET
 )
 
-"""
 certs_list = certificates.search(
     'parsed.issuer.organization.raw: "DigiCert Inc"',
     fields=[
@@ -240,6 +242,8 @@ certs_list = certificates.search(
     ]
 )
 """
+all_certs = []
+revoked_certs = []
 
 
 if not args.path:
@@ -250,12 +254,27 @@ crls = processCTData(args.path)
 print("All done. Process results: {}".format(counter))
 print("CRL Distribution Points: %s" % CRL_distribution_points)
 
+print("Fetching %s CRLs ..." % len(CRL_distribution_points))
+for point in CRL_distribution_points:
+    # Fetch and load the CRL
+    resp = requests.get(point)
+    crl = OpenSSL.crypto.load_crl(OpenSSL.crypto.FILETYPE_ASN1, resp.content)
+
+    # Export CRL as cryptography lib CRL
+    crl_for_cryptography = crl.to_cryptography()
+
+    # Get the CRL issuer certificate
+    # Get the CRL issuer public signing key
+    # Validate the CRL against the CRL issuer public signing key
+
+    revocations_tuple = crl.get_revoked()
+    for revocation in revocations_tuple:
+        revoked_certs.append(revocation)
+
+print("%s revoked certs." % len(revoked_certs))
 mlbf_file_version = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
 MLBF_FILENAME = 'moz-crlite-mlbf-%s' % mlbf_file_version
-
-all_certs = []
-revoked_certs = []
 
 for idx, c in enumerate(certs_list):
     print "Iteration %i" % idx
