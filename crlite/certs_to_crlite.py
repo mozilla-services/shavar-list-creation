@@ -1,24 +1,10 @@
 # Python Standard Library
-import argparse
 from datetime import datetime
+import json
 from struct import pack
-import sys
-
-# 3rd-party libraries
-import OpenSSL
-import requests
 
 # Local modules
 from filter_cascade import FilterCascade
-from ct_fetch_utils import processCTData
-
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--path", required=True,
-                    help="Path to folder on disk with CT certs from ct-fetch")
-args = parser.parse_args()
-
-certs_list = []
 
 
 """
@@ -42,56 +28,30 @@ certs_list = certificates.search(
     ]
 )
 """
-all_certs = []
+nonrevoked_certs_file = open('final_crl_nonrevoked.json')
+revoked_certs_file = open('final_crl_revoked.json')
+
+nonrevoked_certs = []
 revoked_certs = []
 
-
-if not args.path:
-    parser.print_usage()
-    sys.exit(0)
-
-CRL_distribution_points = processCTData(args.path)
-print("CRL Distribution Points: %s" % CRL_distribution_points)
-
-print("Fetching %s CRLs ..." % len(CRL_distribution_points))
-for point in CRL_distribution_points:
-    # Fetch and load the CRL
-    resp = requests.get(point)
-    crl = OpenSSL.crypto.load_crl(OpenSSL.crypto.FILETYPE_ASN1, resp.content)
-
-    # Export CRL as cryptography lib CRL
-    crl_for_cryptography = crl.to_cryptography()
-
-    # Get the CRL issuer certificate
-    # Get the CRL issuer public signing key
-    # Validate the CRL against the CRL issuer public signing key
-
-    revocations_tuple = crl.get_revoked()
-    for revocation in revocations_tuple:
-        revoked_certs.append(revocation)
 
 print("%s revoked certs." % len(revoked_certs))
 mlbf_file_version = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
 MLBF_FILENAME = 'moz-crlite-mlbf-%s' % mlbf_file_version
 
-for idx, c in enumerate(certs_list):
-    print "Iteration %i" % idx
-    print c
-    if idx == 500:
-        break
-    # let's say every third cert should *not* be in the filter
-    shouldBeRevoked = (idx % 3 == 1)
-    if shouldBeRevoked:
-        # print "Appending %s to revoked list." % c
-        all_certs.append(c["parsed.fingerprint_sha256"])
-    else:
-        # print "Appending %s to okay list." % c
-        revoked_certs.append(c["parsed.fingerprint_sha256"])
+for line in nonrevoked_certs_file:
+    cert = json.loads(line)
+    nonrevoked_certs.append(str(cert['serial_number']))
 
-cascade = FilterCascade(500, 1.3, 0.77, 1)
-cascade.initialize(all_certs, revoked_certs)
-cascade.check(all_certs, revoked_certs)
+for line in revoked_certs_file:
+    cert = json.loads(line)
+    revoked_certs.append(str(cert['serial_number']))
+
+
+cascade = FilterCascade(70000, 1.3, 0.77, 1)
+cascade.initialize(nonrevoked_certs, revoked_certs)
+cascade.check(nonrevoked_certs, revoked_certs)
 
 print("This filter cascade uses %d layers and %d bits" % (
     cascade.layerCount(),
