@@ -7,38 +7,36 @@ from struct import pack
 from filter_cascade import FilterCascade
 
 
-"""
-CENSYS_API_UID = config("CENSYS_API_UID", None)
-CENSYS_API_SECRET = config("CENSYS_API_SECRET", None)
+mlbf_file_version = datetime.utcnow().strftime('%Y%m%d%H%M')
+MLBF_FILENAME = 'moz-crlite-mlbf-%s' % mlbf_file_version
+NONREVOKED_CERTS_FILENAME = 'final_crl_nonrevoked.json'
+REVOKED_CERTS_FILENAME = 'final_crl_revoked.json'
 
-if not CENSYS_API_UID or not CENSYS_API_SECRET:
-    print "Must set CENSYS_API_UID and CENSYS_API_SECRET"
-    sys.exit(1)
 
-certificates = censys.certificates.CensysCertificates(
-    CENSYS_API_UID, CENSYS_API_SECRET
-)
+def bufcount(filename):
+    f = open(filename)
+    lines = 0
+    buf_size = 1024 * 1024
+    read_f = f.read
 
-certs_list = certificates.search(
-    'parsed.issuer.organization.raw: "DigiCert Inc"',
-    fields=[
-        "parsed.fingerprint_sha256",
-        "parsed.extensions.crl_distribution_points",
-        "parsed.extensions.crl_distribution_points.raw",
-    ]
-)
-"""
-nonrevoked_certs_file = open('final_crl_nonrevoked.json')
-revoked_certs_file = open('final_crl_revoked.json')
+    buf = read_f(buf_size)
+    while buf:
+        lines += buf.count('\n')
+        buf = read_f(buf_size)
+
+    return lines
+
+
+print("Turning %s nonrevoked and %s revoked certs into %s" % (
+    bufcount(NONREVOKED_CERTS_FILENAME), bufcount(REVOKED_CERTS_FILENAME),
+    MLBF_FILENAME
+))
 
 nonrevoked_certs = []
 revoked_certs = []
 
-
-print("%s revoked certs." % len(revoked_certs))
-mlbf_file_version = datetime.utcnow().strftime('%Y%m%d%H%M%S')
-
-MLBF_FILENAME = 'moz-crlite-mlbf-%s' % mlbf_file_version
+nonrevoked_certs_file = open(NONREVOKED_CERTS_FILENAME)
+revoked_certs_file = open(REVOKED_CERTS_FILENAME)
 
 for line in nonrevoked_certs_file:
     cert = json.loads(line)
