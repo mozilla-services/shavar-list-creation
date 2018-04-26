@@ -19,6 +19,12 @@ class FilterCascade:
 
     def initialize(self, entries, exclusions):
         # set the "salt" for this layer
+        print("Initializing the %s-depth layer." % self.depth)
+        entries_length = len(entries)
+        exclusions_length = len(exclusions)
+        print("%s entries and %s exclusions." % (
+            entries_length, exclusions_length
+        ))
         self.salt = "a" * self.depth
 
         # loop over the elements that should be there. Add them to the filter.

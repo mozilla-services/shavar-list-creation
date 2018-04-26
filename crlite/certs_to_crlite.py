@@ -40,14 +40,14 @@ revoked_certs_file = open(REVOKED_CERTS_FILENAME)
 
 for line in nonrevoked_certs_file:
     cert = json.loads(line)
-    nonrevoked_certs.append(str(cert['serial_number']))
+    nonrevoked_certs.append(cert['issuer']['organization'] + str(cert['serial_number']))
 
 for line in revoked_certs_file:
     cert = json.loads(line)
-    revoked_certs.append(str(cert['serial_number']))
+    revoked_certs.append(cert['issuer']['organization'] + str(cert['serial_number']))
 
 
-cascade = FilterCascade(70000, 1.3, 0.77, 1)
+cascade = FilterCascade(10000, 1.3, 0.77, 1)
 cascade.initialize(nonrevoked_certs, revoked_certs)
 cascade.check(nonrevoked_certs, revoked_certs)
 
