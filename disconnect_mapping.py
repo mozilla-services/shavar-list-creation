@@ -1,7 +1,8 @@
+# Started from https://github.com/mozilla-mobile/focus-android/blob/5868770104a8645c31b086a5e9916f4ddb507cb3/shavar-prod-lists/google_mapping.json
 disconnect_mapping = {
 
-  #google
-  
+  # google
+
   "developers.google.com": "Social",
   "gmail.com": "Social",
   "mail.google.com": "Social",
@@ -11,6 +12,7 @@ disconnect_mapping = {
   "plusone.google.com": "Social",
   "voice.google.com": "Social",
   "googlemail.com": "Social",
+  "wave.google.com": "Social",
 
   "google-analytics.com": "Analytics",
   "postrank.com": "Analytics",
@@ -25,16 +27,14 @@ disconnect_mapping = {
   "googleadservices.com": "Advertising",
   "googlesyndication.com": "Advertising",
   "googletagservices.com": "Advertising",
-  "invitedmedia.com": "Advertising",
+  "googletagmanager.com": "Advertising",
+  "invitemedia.com": "Advertising",
   "smtad.net": "Advertising",
-  "terracent.com": "Advertising",
-  "terracent.net": "Advertising",
+  "teracent.com": "Advertising",
+  "teracent.net": "Advertising",
   "ytsa.net": "Advertising",
-  
 
-  
-  
-  #facebook
+  # facebook
 
   "facebook.com": "Social",
   "facebook.de": "Social",
@@ -45,18 +45,15 @@ disconnect_mapping = {
 
   "atlassolutions.com": "Advertising",
 
-
-  
-  
-  #twitter 
+  # twitter
 
   "twitter.com": "Social",
-  "tiwtter.jp": "Social",
+  "twitter.jp": "Social",
   "twimg.com": "Social",
 
-  #now kicking to a godaddy default / looks abandoned
+  # now kicking to a godaddy default / looks abandoned
   "backtype.com": "Social",
-  #do we leave or remove?
+  # do we leave or remove?
 
   "crashlytics.com": "Analytics",
   "tweetdeck.com": "Analytics"

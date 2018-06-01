@@ -6,12 +6,37 @@ generates safebrowsing-compatible digest list files to be served by
 [shavar](https://github.com/mozilla-services/shavar).
 
 # Requirements
-A `shavar_list_creation.ini` file must exist in the same directory that specifies the following parameters. (See `sample_shavar_list_creation.ini` for an example.)
+
+* python 2.x
+* (optional) virtualenv and/or virtualenvwrapper
 
 # Run
-```
-./lists2safebrowsing.py
-```
+
+1. (optional) Make a virtualenv for the project and activate it:
+
+    ```
+    virtualenv shavar-list-creation
+    source shavar-list-creation/bin/activate
+    ```
+
+2. Install required libraries:
+
+    ```
+    pip install -r requirements.txt
+    ```
+
+3. Copy the `sample_shavar_list_creation.ini` file to
+   `shavar_list_creation.ini`:
+
+    ```
+    cp sample_shavar_list_creation.ini shavar_list_creation.ini
+    ```
+
+4. Run the `lists2safebrowsing.py` script:
+
+    ```
+    ./lists2safebrowsing.py
+    ```
 
 # Usage
 This is run by a Jenkins deployment job every 30 minutes that:
