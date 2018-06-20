@@ -16,6 +16,7 @@ import boto.s3.key
 from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
 
+from disconnect_mapping import disconnect_mapping
 
 updatePSL()
 psl = PublicSuffixList()
@@ -216,6 +217,14 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
           domains = org_json[top]
           for d in domains:
             d = d.encode('utf-8');
+            if c == "Disconnect":
+                try:
+                    if not disconnect_mapping[d] in list_categories:
+                        continue
+                except KeyError:
+                    sys.stderr.write(
+                        "[ERROR] %s not found in disconnect_mapping" % d
+                    )
             canon_d = canonicalize(d);
             if (not canon_d in domain_dict) and (not d in allow_list):
               # check if the domain is in the public suffix list
