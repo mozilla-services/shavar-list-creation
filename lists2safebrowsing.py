@@ -35,7 +35,9 @@ PLUGIN_SECTIONS = (
 WHITELIST_SECTIONS = (
     "entity-whitelist",
     "entity-whitelist-testing",
-    "staging-entity-whitelist"
+    "staging-entity-whitelist",
+    "fastblock1-whitelist",
+    "fastblock2-whitelist"
 )
 PRE_DNT_SECTIONS = (
     "tracking-protection",
@@ -49,7 +51,6 @@ PRE_DNT_CONTENT_SECTIONS = (
     "tracking-protection-full",
     "staging-tracking-protection-full"
 )
-
 DNT_SECTIONS = (
     "tracking-protection-base",
     "tracking-protection-baseeff",
@@ -60,6 +61,9 @@ DNT_SECTIONS = (
     "tracking-protection-ads",
     "tracking-protection-analytics",
     "tracking-protection-social",
+    "fastblock1",
+    "fastblock2",
+    "fastblock3"
 )
 DNT_CONTENT_SECTIONS = (
     "tracking-protection-content",
@@ -78,7 +82,15 @@ DNT_W3C_SECTIONS = (
     "tracking-protection-basew3c",
     "tracking-protection-contentw3c"
 )
+FASTBLOCK_SECTIONS = (
+    "fastblock1",
+    "fastblock1-whitelist",
+    "fastblock2",
+    "fastblock2-whitelist",
+    "fastblock3"
+)
 
+#this script assumes that fastblock list categories == default disconnect categories
 DEFAULT_DISCONNECT_LIST_CATEGORIES = 'Advertising,Analytics,Social,Disconnect'
 
 
@@ -109,7 +121,7 @@ def load_json_from_url(config, section, key):
 # https://web.archive.org/web/20160422212049/https://developers.google.com/safe-browsing/developers_guide_v2#Canonicalization
 def canonicalize(d):
   if (not d or d == ""):
-    return d;
+    return d
 
   # remove tab (0x09), CR (0x0d), LF (0x0a)
   # TODO?: d, _subs_made = re.subn("\t|\r|\n", "", d)
@@ -122,11 +134,11 @@ def canonicalize(d):
 
   # repeatedly unescape until no more hex encodings
   while (1):
-    _d = d;
-    d = urllib2.unquote(_d);
+    _d = d
+    d = urllib2.unquote(_d)
     # if decoding had no effect, stop
     if (d == _d):
-      break;
+      break
 
   # extract hostname (scheme://)(username(:password)@)hostname(:port)(/...)
   # extract path
@@ -135,8 +147,8 @@ def canonicalize(d):
     re.compile(
       "^(?:[a-z]+\:\/\/)?(?:[a-z]+(?:\:[a-z0-9]+)?@)?([^\/^\?^\:]+)(?:\:[0-9]+)?(\/(.*)|$)"), d);
   host = url_components.group(1);
-  path = url_components.group(2) or "";
-  path = re.subn("^(\/)+", "", path)[0];
+  path = url_components.group(2) or ""
+  path = re.subn("^(\/)+", "", path)[0]
 
   # remove leading and trailing dots
   # TODO?: host, _subs_made = re.subn("^\.+|\.+$", "", host)
@@ -145,28 +157,27 @@ def canonicalize(d):
   # TODO?: host, _subs_made = re.subn("\.+", ".", host)
   host = re.subn("\.+", ".", host)[0];
   # lowercase the whole thing
-  host = host.lower();
+  host = host.lower()
 
   # percent-escape any characters <= ASCII 32, >= 127, or '#' or '%'
-  _path = "";
+  _path = ""
   for i in path:
     if (ord(i) <= 32 or ord(i) >= 127 or i == '#' or i == '%'):
-      _path += urllib2.quote(i);
+      _path += urllib2.quote(i)
     else:
-      _path += i;
+      _path += i
 
   # Note: we do NOT append the scheme
   # because safebrowsing lookups ignore it
-  return host + "/" + _path;
+  return host + "/" + _path
 
 
 # TODO?: rename find_tracking_hosts
-def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
-               which_dnt, list_categories, name):
+def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file, which_dnt, list_categories, section_name):
   """Finds hosts that we should block from the Disconnect json.
 
   Args:
-    disconnect_json: A JSON blob containing Disconnect's list.
+    blocklist_json: A JSON blob containing Disconnect's list.
     allow_list: Hosts that we can't put on the blocklist.
     chunk: The chunk number to use.
     output_file: A file-handle to the output file.
@@ -176,7 +187,7 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
   publishing = 0
 
   # Total number of bytes, 0 % 32
-  hashdata_bytes = 0;
+  hashdata_bytes = 0
 
   # Remember previously-processed domains so we don't print them more than once
   # TODO?: domain_dict = []
@@ -184,9 +195,9 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
 
   # Array holding hash bytes to be written to f_out. We need the total bytes
   # before writing anything.
-  output = [];
+  output = []
 
-  categories = disconnect_json["categories"]
+  categories = blocklist_json["categories"]
 
   for c in categories:
     add_category_to_list = False
@@ -241,7 +252,7 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
               publishing += 1
               domain_dict[canon_d] = 1;
               # TODO?: hashdata_bytes += hashdata.digest_size
-              hashdata_bytes += 32;
+              hashdata_bytes += 32
               output.append(hashlib.sha256(canon_d).digest());
 
 
@@ -251,15 +262,15 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
   output_string = "a:%u:32:%s\n" % (chunk, hashdata_bytes);
   for o in output:
     if output_file:
-      output_file.write(o);
+      output_file.write(o)
     output_string = output_string + o
-
-  print "Tracking protection(%s): publishing %d items; file size %d" \
-           % (name, publishing, len(output_string))
+  if (section_name in FASTBLOCK_SECTIONS):
+    print "Fastblock (%s): publishing %d items; file size %d" % (section_name, publishing, len(output_string))
+  else:
+    print "Tracking protection(%s): publishing %d items; file size %d" % (section_name, publishing, len(output_string))
   return output_string
 
-def process_disconnect_entity_whitelist(incoming, chunk, output_file,
-                                        log_file, list_variant):
+def process_entity_whitelist(incoming, chunk, output_file, log_file, list_section):
   """
   Expects a dict from a loaded JSON blob.
   """
@@ -278,8 +289,7 @@ def process_disconnect_entity_whitelist(incoming, chunk, output_file,
         d = canonicalize('%s/?resource=%s' % (prop, res))
         h = hashlib.sha256(d)
         if log_file:
-          log_file.write("[entity] %s >> (canonicalized) %s, hash %s\n"
-                         % (name, d, h.hexdigest()))
+          log_file.write("[entity] %s >> (canonicalized) %s, hash %s\n" % (name, d, h.hexdigest()))
         urls.add(d)
         publishing += 1
         hashdata_bytes += 32
@@ -293,11 +303,12 @@ def process_disconnect_entity_whitelist(incoming, chunk, output_file,
 
   output_file.flush()
   output_size = os.fstat(output_file.fileno()).st_size
-  print "Entity whitelist(%s): publishing %d items; file size %d" \
-           % (list_variant, publishing, output_size)
+  if (list_section in FASTBLOCK_SECTIONS):
+    print "Fastblock whitelist (%s): publishing %d items; file size %d" % (list_section, publishing, output_size)
+  else:
+    print "Entity whitelist(%s): publishing %d items; file size %d" % (list_section, publishing, output_size)
 
-def process_plugin_blocklist(incoming, chunk, output_file, log_file,
-                             list_variant):
+def process_plugin_blocklist(incoming, chunk, output_file, log_file, list_section):
   publishing = 0
   domains = set()
   hashdata_bytes = 0
@@ -307,8 +318,7 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
     if canon_d not in domains:
       h = hashlib.sha256(canon_d)
       if log_file:
-        log_file.write("[plugin-blocklist] %s >> (canonicalized) %s, hash %s\n"
-                       % (d, canon_d, h.hexdigest()))
+        log_file.write("[plugin-blocklist] %s >> (canonicalized) %s, hash %s\n" % (d, canon_d, h.hexdigest()))
       publishing += 1
       domains.add(canon_d)
       hashdata_bytes += 32
@@ -322,7 +332,7 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
   output_file.flush()
   output_size = os.fstat(output_file.fileno()).st_size
   print "Plugin blocklist(%s): publishing %d items; file size %d" \
-           % (list_variant, publishing, output_size)
+           % (list_section, publishing, output_size)
 
 def chunk_metadata(fp):
   # Read the first 25 bytes and look for a new line.  Since this is a file
@@ -331,8 +341,7 @@ def chunk_metadata(fp):
   header = fp.read(25)
   eoh = header.find('\n')
   chunktype, chunknum, hash_size, data_len = header[:eoh].split(':')
-  return dict(type=chunktype, num=chunknum, hash_size=hash_size, len=data_len,
-              checksum=hashlib.sha256(fp.read()).hexdigest())
+  return dict(type=chunktype, num=chunknum, hash_size=hash_size, len=data_len, checksum=hashlib.sha256(fp.read()).hexdigest())
 
 def new_data_to_publish(config, section, blob):
   # Get the metadata for our old chunk
@@ -381,8 +390,15 @@ def main():
       continue
 
     if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
-      # process disconnect
-      disconnect_json = load_json_from_url(config, section, "disconnect_url")
+        #this conditional can be removed if we change 'disconnect_url=' to 'blocklist_url=' in the ini file
+      if (section in FASTBLOCK_SECTIONS):
+        #process FASTBLOCK section
+        blocklist_json = load_json_from_url(config, section, "blocklist_url")
+      else:
+        # process disconnect
+        blocklist_json = load_json_from_url(config, section, "disconnect_url")
+
+
 
       output_file, log_file = get_output_and_log_files(config, section)
 
@@ -413,8 +429,7 @@ def main():
       else:
           which_dnt = ""
 
-      find_hosts(disconnect_json, allowed, chunknum, output_file, log_file,
-                 which_dnt, list_categories, section)
+      find_hosts(blocklist_json, allowed, chunknum, output_file, log_file, which_dnt, list_categories, section)
 
     if section in PLUGIN_SECTIONS:
       output_file, log_file = get_output_and_log_files(config, section)
@@ -430,18 +445,15 @@ def main():
             continue
           blocked.add(line)
 
-      process_plugin_blocklist(blocked, chunknum, output_file, log_file,
-                               section)
+      process_plugin_blocklist(blocked, chunknum, output_file, log_file, section)
 
     if section in WHITELIST_SECTIONS:
       output_file, log_file = get_output_and_log_files(config, section)
 
       # download and load the business entity oriented whitelist
-      disconnect_json = load_json_from_url(config, section, "entity_url")
+      whitelist_json = load_json_from_url(config, section, "entity_url")
 
-      process_disconnect_entity_whitelist(disconnect_json, chunknum,
-                                          output_file, log_file,
-                                          section)
+      process_entity_whitelist(whitelist_json, chunknum, output_file, log_file, section)
 
   if output_file:
     output_file.close()
@@ -474,8 +486,7 @@ def main():
     if config.has_option(section, "s3_key"):
       key = config.get(section, "s3_key")
 
-    chunk_key = os.path.join(config.get(section, os.path.basename('output')),
-                             str(chunknum))
+    chunk_key = os.path.join(config.get(section, os.path.basename('output')), str(chunknum))
 
     if not bucket or not key:
       sys.stderr.write("Can't upload to s3 without s3_bucket and s3_key\n")
