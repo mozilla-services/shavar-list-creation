@@ -35,7 +35,9 @@ PLUGIN_SECTIONS = (
 WHITELIST_SECTIONS = (
     "entity-whitelist",
     "entity-whitelist-testing",
-    "staging-entity-whitelist"
+    "staging-entity-whitelist",
+    "fastblock1-whitelist",
+    "fastblock2-whitelist"
 )
 PRE_DNT_SECTIONS = (
     "tracking-protection",
@@ -49,7 +51,6 @@ PRE_DNT_CONTENT_SECTIONS = (
     "tracking-protection-full",
     "staging-tracking-protection-full"
 )
-
 DNT_SECTIONS = (
     "tracking-protection-base",
     "tracking-protection-baseeff",
@@ -60,6 +61,9 @@ DNT_SECTIONS = (
     "tracking-protection-ads",
     "tracking-protection-analytics",
     "tracking-protection-social",
+    "fastblock1",
+    "fastblock2",
+    "fastblock3"
 )
 DNT_CONTENT_SECTIONS = (
     "tracking-protection-content",
@@ -77,6 +81,13 @@ DNT_EFF_SECTIONS = (
 DNT_W3C_SECTIONS = (
     "tracking-protection-basew3c",
     "tracking-protection-contentw3c"
+)
+FASTBLOCK_SECTIONS = (
+    "fastblock1",
+    "fastblock1-whitelist",
+    "fastblock2",
+    "fastblock2-whitelist",
+    "fastblock3"
 )
 
 DEFAULT_DISCONNECT_LIST_CATEGORIES = 'Advertising,Analytics,Social,Disconnect'
@@ -161,12 +172,12 @@ def canonicalize(d):
 
 
 # TODO?: rename find_tracking_hosts
-def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
+def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
                which_dnt, list_categories, name):
   """Finds hosts that we should block from the Disconnect json.
 
   Args:
-    disconnect_json: A JSON blob containing Disconnect's list.
+    blocklist_json: A JSON blob containing Disconnect's list.
     allow_list: Hosts that we can't put on the blocklist.
     chunk: The chunk number to use.
     output_file: A file-handle to the output file.
@@ -186,7 +197,7 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
   # before writing anything.
   output = [];
 
-  categories = disconnect_json["categories"]
+  categories = blocklist_json["categories"]
 
   for c in categories:
     add_category_to_list = False
@@ -254,11 +265,14 @@ def find_hosts(disconnect_json, allow_list, chunk, output_file, log_file,
       output_file.write(o);
     output_string = output_string + o
 
-  print "Tracking protection(%s): publishing %d items; file size %d" \
-           % (name, publishing, len(output_string))
+  if (name in FASTBLOCK_SECTIONS): 
+    print "Fastblock(%s): publishing %d items; file size %d" % (name, publishing, len(output_string))
+  else:
+    print "Tracking protection(%s): publishing %d items; file size %d" \
+            % (name, publishing, len(output_string))
   return output_string
 
-def process_disconnect_entity_whitelist(incoming, chunk, output_file,
+def process_entity_whitelist(incoming, chunk, output_file,
                                         log_file, list_variant):
   """
   Expects a dict from a loaded JSON blob.
@@ -293,8 +307,11 @@ def process_disconnect_entity_whitelist(incoming, chunk, output_file,
 
   output_file.flush()
   output_size = os.fstat(output_file.fileno()).st_size
-  print "Entity whitelist(%s): publishing %d items; file size %d" \
-           % (list_variant, publishing, output_size)
+  if(list_variant in FASTBLOCK_SECTIONS):
+    print "Fastblock whitelist(%s): publishing %d items; file size %d" % (list_variant, publishing, output_size)
+  else:
+    print "Entity whitelist(%s): publishing %d items; file size %d" \
+            % (list_variant, publishing, output_size)
 
 def process_plugin_blocklist(incoming, chunk, output_file, log_file,
                              list_variant):
@@ -381,8 +398,12 @@ def main():
       continue
 
     if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
-      # process disconnect
-      disconnect_json = load_json_from_url(config, section, "disconnect_url")
+      if (section in FASTBLOCK_SECTIONS):
+        # process fastblock
+        blocklist_json = load_json_from_url(config, section, "blocklist_url")
+      else:
+        # process disconnect
+        blocklist_json = load_json_from_url(config, section, "disconnect_url")
 
       output_file, log_file = get_output_and_log_files(config, section)
 
@@ -413,7 +434,7 @@ def main():
       else:
           which_dnt = ""
 
-      find_hosts(disconnect_json, allowed, chunknum, output_file, log_file,
+      find_hosts(blocklist_json, allowed, chunknum, output_file, log_file,
                  which_dnt, list_categories, section)
 
     if section in PLUGIN_SECTIONS:
@@ -437,9 +458,9 @@ def main():
       output_file, log_file = get_output_and_log_files(config, section)
 
       # download and load the business entity oriented whitelist
-      disconnect_json = load_json_from_url(config, section, "entity_url")
+      whitelist = load_json_from_url(config, section, "entity_url")
 
-      process_disconnect_entity_whitelist(disconnect_json, chunknum,
+      process_entity_whitelist(whitelist, chunknum,
                                           output_file, log_file,
                                           section)
 
