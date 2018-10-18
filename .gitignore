@@ -1,3 +1,8 @@
 /shavar_list_creation.ini
 *.log
 *-digest256
+
+# Python Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
