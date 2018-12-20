@@ -61,6 +61,10 @@ DNT_SECTIONS = (
     "tracking-protection-ads",
     "tracking-protection-analytics",
     "tracking-protection-social",
+    "tracking-protection-base-fingerprinting",
+    "tracking-protection-content-fingerprinting",
+    "tracking-protection-base-cryptomining",
+    "tracking-protection-content-cryptomining",
     "fastblock1",
     "fastblock2",
     "fastblock3"
@@ -89,6 +93,25 @@ FASTBLOCK_SECTIONS = (
     "fastblock2-whitelist",
     "fastblock3"
 )
+FINGERPRINTING_SECTIONS = (
+    "tracking-protection-base-fingerprinting",
+    "tracking-protection-content-fingerprinting"
+)
+CRYPTOMINING_SECTIONS = (
+    "tracking-protection-base-cryptomining",
+    "tracking-protection-content-cryptomining"
+)
+
+FINGERPRINTING_TAG = 'fingerprinting'
+CRYPTOMINING_TAG = 'cryptominer'
+SESSION_REPLAY_TAG = 'session-replay'
+PERFORMANCE_TAG = 'performance'
+ALL_TAGS = {
+    FINGERPRINTING_TAG,
+    CRYPTOMINING_TAG,
+    SESSION_REPLAY_TAG,
+    PERFORMANCE_TAG
+}
 
 DEFAULT_DISCONNECT_LIST_CATEGORIES = 'Advertising,Analytics,Social,Disconnect'
 
@@ -173,7 +196,7 @@ def canonicalize(d):
 
 # TODO?: rename find_tracking_hosts
 def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
-               which_dnt, list_categories, name):
+               which_dnt, list_categories, name, which_tag):
   """Finds hosts that we should block from the Disconnect json.
 
   Args:
@@ -182,6 +205,13 @@ def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
     chunk: The chunk number to use.
     output_file: A file-handle to the output file.
     log_file: A filehandle to the log file.
+    which_dnt: A filter to restrict output to section of the list with the
+        specified DNT tag.
+    list_categories : A filter to restrict output to the specified top-level
+        categories.
+    name : The section name from `shavar_list_creation.ini`
+    which_tag : A filter to restrict output to sections of the list with the
+        specified sub-category tag.
   """
   # Number of items published
   publishing = 0
@@ -220,10 +250,24 @@ def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
     for org in categories[c]:
       for orgname in org:
         org_json = org[orgname]
+
+        # Skip organization if it doesn't have the desired dnt annotation
         dnt_value = org_json.pop('dnt', '')
         assert dnt_value in ["w3c", "eff", ""]
         if dnt_value != which_dnt:
             continue
+
+        # Skip organization if it doesn't have the desired sub-category tag
+        org_tags = [""]
+        for tag in ALL_TAGS:
+            tag_value = org_json.pop(tag, '')
+            assert tag_value in ["true", ""]
+            if tag_value == "":
+                continue
+            org_tags.append(tag)
+        if which_tag not in org_tags:
+            continue
+
         for top in org_json:
           domains = org_json[top]
           for d in domains:
@@ -434,8 +478,15 @@ def main():
       else:
           which_dnt = ""
 
+      if section in FINGERPRINTING_SECTIONS:
+          which_tag = FINGERPRINTING_TAG
+      elif section in CRYPTOMINING_SECTIONS:
+          which_tag = CRYPTOMINING_TAG
+      else:
+          which_tag = ""
+
       find_hosts(blocklist_json, allowed, chunknum, output_file, log_file,
-                 which_dnt, list_categories, section)
+                 which_dnt, list_categories, section, which_tag)
 
     if section in PLUGIN_SECTIONS:
       output_file, log_file = get_output_and_log_files(config, section)
