@@ -65,6 +65,7 @@ DNT_SECTIONS = (
     "tracking-protection-content-fingerprinting",
     "tracking-protection-base-cryptomining",
     "tracking-protection-content-cryptomining",
+    "tracking-protection-test-multitag",
     "fastblock1",
     "fastblock2",
     "fastblock3"
@@ -93,14 +94,6 @@ FASTBLOCK_SECTIONS = (
     "fastblock2-whitelist",
     "fastblock3"
 )
-FINGERPRINTING_SECTIONS = (
-    "tracking-protection-base-fingerprinting",
-    "tracking-protection-content-fingerprinting"
-)
-CRYPTOMINING_SECTIONS = (
-    "tracking-protection-base-cryptomining",
-    "tracking-protection-content-cryptomining"
-)
 
 FINGERPRINTING_TAG = 'fingerprinting'
 CRYPTOMINING_TAG = 'cryptominer'
@@ -114,6 +107,7 @@ ALL_TAGS = {
 }
 
 DEFAULT_DISCONNECT_LIST_CATEGORIES = 'Advertising,Analytics,Social,Disconnect'
+DEFAULT_DISCONNECT_LIST_TAGS = {""}
 
 
 def get_output_and_log_files(config, section):
@@ -196,7 +190,7 @@ def canonicalize(d):
 
 # TODO?: rename find_tracking_hosts
 def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
-               which_dnt, list_categories, name, which_tag):
+               which_dnt, list_categories, name, desired_tags):
   """Finds hosts that we should block from the Disconnect json.
 
   Args:
@@ -210,8 +204,8 @@ def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
     list_categories : A filter to restrict output to the specified top-level
         categories.
     name : The section name from `shavar_list_creation.ini`
-    which_tag : A filter to restrict output to sections of the list with the
-        specified sub-category tag.
+    desired_tags : A filter to restrict output to sections of the list with the
+        specified sub-category tags.
   """
   # Number of items published
   publishing = 0
@@ -258,14 +252,14 @@ def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
             continue
 
         # Skip organization if it doesn't have the desired sub-category tag
-        org_tags = [""]
+        observed_tags = {""}
         for tag in ALL_TAGS:
             tag_value = org_json.pop(tag, '')
             assert tag_value in ["true", ""]
             if tag_value == "":
                 continue
-            org_tags.append(tag)
-        if which_tag not in org_tags:
+            observed_tags.add(tag)
+        if len(desired_tags.intersection(observed_tags)) == 0:
             continue
 
         for top in org_json:
@@ -478,15 +472,19 @@ def main():
       else:
           which_dnt = ""
 
-      if section in FINGERPRINTING_SECTIONS:
-          which_tag = FINGERPRINTING_TAG
-      elif section in CRYPTOMINING_SECTIONS:
-          which_tag = CRYPTOMINING_TAG
-      else:
-          which_tag = ""
+      try:
+          desired_tags = set(config.get(section, "disconnect_tags").split(','))
+          if len(desired_tags.difference(ALL_TAGS)) > 0:
+              raise ValueError(
+                  "The configuration file contains unsupported tags.\n"
+                  "Supported tags: %s\nConfig file tags: %s" %
+                  (ALL_TAGS, desired_tags)
+              )
+      except ConfigParser.NoOptionError:
+          desired_tags = DEFAULT_DISCONNECT_LIST_TAGS
 
       find_hosts(blocklist_json, allowed, chunknum, output_file, log_file,
-                 which_dnt, list_categories, section, which_tag)
+                 which_dnt, list_categories, section, desired_tags)
 
     if section in PLUGIN_SECTIONS:
       output_file, log_file = get_output_and_log_files(config, section)
