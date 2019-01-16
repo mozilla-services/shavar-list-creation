@@ -45,7 +45,12 @@ PRE_DNT_SECTIONS = (
     "tracking-protection-standard",
     "tracking-protection-full",
     "staging-tracking-protection-standard",
-    "staging-tracking-protection-full"
+    "staging-tracking-protection-full",
+    "fanboy-annoyance",
+    "fanboy-social",
+    "easylist",
+    "easyprivacy",
+    "adguard",
 )
 PRE_DNT_CONTENT_SECTIONS = (
     "tracking-protection-full",
