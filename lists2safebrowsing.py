@@ -111,6 +111,8 @@ ALL_TAGS = {
     PERFORMANCE_TAG
 }
 
+TEST_DOMAIN_TEMPLATE = '%s.dummytracker.org'
+
 DEFAULT_DISCONNECT_LIST_CATEGORIES = 'Advertising,Analytics,Social,Disconnect'
 DEFAULT_DISCONNECT_LIST_TAGS = {""}
 
@@ -193,9 +195,30 @@ def canonicalize(d):
   return host + "/" + _path;
 
 
+def add_domain_to_list(domain, previous_domains, allow_list,
+                       log_file, output, publishing, hashdata_bytes):
+    canon_d = canonicalize(domain)
+    if (canon_d not in previous_domains) and (domain not in allow_list):
+        # check if the domain is in the public suffix list
+        # SafeBrowsing keeps trailing '/', PublicSuffix does not
+        psl_d = canon_d.rstrip('/')
+        if psl.publicsuffix(psl_d) == psl_d:
+            if log_file:
+                log_file.write("[Public Suffix] %s; Skipping.\n" % psl_d)
+            return
+    if log_file:
+        log_file.write("[m] %s >> %s\n" % (domain, canon_d))
+        log_file.write("[canonicalized] %s\n" % (canon_d))
+        log_file.write("[hash] %s\n" % hashlib.sha256(canon_d).hexdigest())
+    publishing += 1
+    previous_domains.add(canon_d)
+    # TODO?: hashdata_bytes += hashdata.digest_size
+    hashdata_bytes += 32
+    output.append(hashlib.sha256(canon_d).digest())
+
 # TODO?: rename find_tracking_hosts
 def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
-               which_dnt, list_categories, name, desired_tags):
+               which_dnt, list_categories, name, output_name, desired_tags):
   """Finds hosts that we should block from the Disconnect json.
 
   Args:
@@ -209,6 +232,7 @@ def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
     list_categories : A filter to restrict output to the specified top-level
         categories.
     name : The section name from `shavar_list_creation.ini`
+    output_name : The output filename from `shavar_list_creation.ini`
     desired_tags : A filter to restrict output to sections of the list with the
         specified sub-category tags.
   """
@@ -219,27 +243,21 @@ def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
   hashdata_bytes = 0;
 
   # Remember previously-processed domains so we don't print them more than once
-  # TODO?: domain_dict = []
-  domain_dict = {};
+  previous_domains = set()
 
   # Array holding hash bytes to be written to f_out. We need the total bytes
   # before writing anything.
   output = [];
 
+  # Add a static test domain to list
+  add_domain_to_list(
+      TEST_DOMAIN_TEMPLATE % output_name, previous_domains,
+      allow_list, log_file, output, publishing, hashdata_bytes
+  )
+
   categories = blocklist_json["categories"]
 
-  for c in categories:
-    add_category_to_list = False
-    for lc in list_categories.split(","):
-      if c.find(lc) != -1:
-          add_category_to_list = True
-    if not add_category_to_list:
-      continue
-    if add_category_to_list:
-      # Is this list a single-category list?
-      if len(list_categories) == 1:
-        # Reset output to only include this category's content
-        output = []
+  for c in list_categories.split(","):
     if log_file:
       log_file.write("Processing %s\n" % c)
 
@@ -279,25 +297,10 @@ def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
                     sys.stderr.write(
                         "[ERROR] %s not found in disconnect_mapping\n" % d
                     )
-            canon_d = canonicalize(d);
-            if (not canon_d in domain_dict) and (not d in allow_list):
-              # check if the domain is in the public suffix list
-              # SafeBrowsing keeps trailing '/', PublicSuffix does not
-              psl_d = canon_d.rstrip('/')
-              if psl.publicsuffix(psl_d) == psl_d:
-                if log_file:
-                  log_file.write("[Public Suffix] %s; Skipping.\n" % psl_d)
-                continue
-              if log_file:
-                log_file.write("[m] %s >> %s\n" % (d, canon_d));
-                log_file.write("[canonicalized] %s\n" % (canon_d));
-                log_file.write("[hash] %s\n" % hashlib.sha256(canon_d).hexdigest());
-              publishing += 1
-              domain_dict[canon_d] = 1;
-              # TODO?: hashdata_bytes += hashdata.digest_size
-              hashdata_bytes += 32;
-              output.append(hashlib.sha256(canon_d).digest());
-
+            add_domain_to_list(
+                d, previous_domains, allow_list, log_file, output,
+                publishing, hashdata_bytes
+            )
 
   # Write safebrowsing-list format header
   if output_file:
@@ -488,8 +491,11 @@ def main():
       except ConfigParser.NoOptionError:
           desired_tags = DEFAULT_DISCONNECT_LIST_TAGS
 
-      find_hosts(blocklist_json, allowed, chunknum, output_file, log_file,
-                 which_dnt, list_categories, section, desired_tags)
+      output_filename = config.get(section, "output")
+      find_hosts(
+          blocklist_json, allowed, chunknum, output_file, log_file, which_dnt,
+          list_categories, section, output_filename, desired_tags
+      )
 
     if section in PLUGIN_SECTIONS:
       output_file, log_file = get_output_and_log_files(config, section)
