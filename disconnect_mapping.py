@@ -25,6 +25,8 @@ disconnect_mapping = {
   "doubleclick.net": "Advertising",
   "adwords.google.com": "Advertising",
   "googleadservices.com": "Advertising",
+  "adservice.google.com": "Advertising",
+  "adservice.google.ca": "Advertising",
   "googlesyndication.com": "Advertising",
   "googletagservices.com": "Advertising",
   "googletagmanager.com": "Advertising",
@@ -56,5 +58,7 @@ disconnect_mapping = {
   # do we leave or remove?
 
   "crashlytics.com": "Analytics",
-  "tweetdeck.com": "Analytics"
+  "tweetdeck.com": "Analytics",
+
+  "ads-twitter.com": "Advertising",
 }
