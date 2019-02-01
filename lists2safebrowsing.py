@@ -277,7 +277,7 @@ def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
                         continue
                 except KeyError:
                     sys.stderr.write(
-                        "[ERROR] %s not found in disconnect_mapping" % d
+                        "[ERROR] %s not found in disconnect_mapping\n" % d
                     )
             canon_d = canonicalize(d);
             if (not canon_d in domain_dict) and (not d in allow_list):
