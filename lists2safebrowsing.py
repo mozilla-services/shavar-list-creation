@@ -195,8 +195,10 @@ def canonicalize(d):
   return host + "/" + _path;
 
 
-def add_domain_to_list(domain, previous_domains, allow_list,
-                       log_file, output, publishing, hashdata_bytes):
+def add_domain_to_list(domain, previous_domains, allow_list, log_file, output):
+    """Prepare domain to be added to output list.
+
+    Returns `True` if a domain was added, `False` otherwise"""
     canon_d = canonicalize(domain)
     if (canon_d not in previous_domains) and (domain not in allow_list):
         # check if the domain is in the public suffix list
@@ -205,16 +207,14 @@ def add_domain_to_list(domain, previous_domains, allow_list,
         if psl.publicsuffix(psl_d) == psl_d:
             if log_file:
                 log_file.write("[Public Suffix] %s; Skipping.\n" % psl_d)
-            return
+            return False
     if log_file:
         log_file.write("[m] %s >> %s\n" % (domain, canon_d))
         log_file.write("[canonicalized] %s\n" % (canon_d))
         log_file.write("[hash] %s\n" % hashlib.sha256(canon_d).hexdigest())
-    publishing += 1
     previous_domains.add(canon_d)
-    # TODO?: hashdata_bytes += hashdata.digest_size
-    hashdata_bytes += 32
     output.append(hashlib.sha256(canon_d).digest())
+    return True
 
 # TODO?: rename find_tracking_hosts
 def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
@@ -250,10 +250,14 @@ def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
   output = [];
 
   # Add a static test domain to list
-  add_domain_to_list(
-      TEST_DOMAIN_TEMPLATE % output_name, previous_domains,
-      allow_list, log_file, output, publishing, hashdata_bytes
+  added = add_domain_to_list(
+      TEST_DOMAIN_TEMPLATE % output_name,
+      previous_domains, allow_list, log_file, output
   )
+  if added:
+      # TODO?: hashdata_bytes += hashdata.digest_size
+      hashdata_bytes += 32
+      publishing += 1
 
   categories = blocklist_json["categories"]
 
@@ -297,10 +301,13 @@ def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
                     sys.stderr.write(
                         "[ERROR] %s not found in disconnect_mapping\n" % d
                     )
-            add_domain_to_list(
-                d, previous_domains, allow_list, log_file, output,
-                publishing, hashdata_bytes
+            added = add_domain_to_list(
+                d, previous_domains, allow_list, log_file, output
             )
+            if added:
+                # TODO?: hashdata_bytes += hashdata.digest_size
+                hashdata_bytes += 32
+                publishing += 1
 
   # Write safebrowsing-list format header
   if output_file:
