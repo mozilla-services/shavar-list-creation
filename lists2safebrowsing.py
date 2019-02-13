@@ -16,10 +16,13 @@ import boto.s3.key
 from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
 
-from disconnect_mapping import disconnect_mapping
-
 updatePSL()
 psl = PublicSuffixList()
+
+DISCONNECT_MAPPING_FILE = os.path.join(
+    os.path.dirname(__file__), 'disconnect_mapping.json')
+with open(DISCONNECT_MAPPING_FILE, 'r') as f:
+    disconnect_mapping = json.load(f)
 
 PLUGIN_SECTIONS = (
     "plugin-blocklist",
