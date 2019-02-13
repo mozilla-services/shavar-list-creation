@@ -19,6 +19,11 @@ from publicsuffixlist.update import updatePSL
 updatePSL()
 psl = PublicSuffixList()
 
+DISCONNECT_MAPPING_FILE = os.path.join(
+    os.path.dirname(__file__), 'disconnect_mapping.json')
+with open(DISCONNECT_MAPPING_FILE, 'r') as f:
+    disconnect_mapping = json.load(f)
+
 PLUGIN_SECTIONS = (
     "plugin-blocklist",
     "plugin-blocklist-experiment",
