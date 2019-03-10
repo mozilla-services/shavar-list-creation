@@ -1,3 +1,4 @@
 boto==2.40.0
 publicsuffixlist==0.4.0
 requests==2.10.0
+trackingprotection_tools==0.4.2

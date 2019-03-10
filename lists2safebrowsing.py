@@ -12,17 +12,16 @@ import urllib2
 
 import boto.s3.connection
 import boto.s3.key
-from disconnect_mapping import disconnect_mapping
 from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
+
+from trackingprotection_tools import DisconnectParser
 
 updatePSL()
 psl = PublicSuffixList()
 
-DISCONNECT_MAPPING_FILE = os.path.join(
+DISCONNECT_MAPPING = os.path.join(
     os.path.dirname(__file__), 'disconnect_mapping.json')
-with open(DISCONNECT_MAPPING_FILE, 'r') as f:
-    disconnect_mapping = json.load(f)
 
 PLUGIN_SECTIONS = (
     "plugin-blocklist",
@@ -117,7 +116,7 @@ ALL_TAGS = {
 TEST_DOMAIN_TEMPLATE = '%s.dummytracker.org'
 
 DEFAULT_DISCONNECT_LIST_CATEGORIES = 'Advertising,Analytics,Social,Disconnect'
-DEFAULT_DISCONNECT_LIST_TAGS = {""}
+DEFAULT_DISCONNECT_LIST_TAGS = {}
 
 
 def get_output_and_log_files(config, section):
@@ -130,11 +129,17 @@ def get_output_and_log_files(config, section):
     return output_file, log_file
 
 
-def load_json_from_url(config, section, key):
+def get_list_url(config, section, key):
+    """Return the requested list URL (or the default, if it isn't found)"""
     try:
         url = config.get(section, key)
     except ConfigParser.NoOptionError:
         url = config.get("main", "default_disconnect_url")
+    return url
+
+
+def load_json_from_url(config, section, key):
+    url = get_list_url(config, section, key)
     try:
         loaded_json = json.loads(urllib2.urlopen(url).read())
     except Exception:
@@ -221,24 +226,61 @@ def add_domain_to_list(domain, previous_domains, allow_list, log_file, output):
     return True
 
 
-def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
-               which_dnt, list_categories, name, output_name, desired_tags):
-    """Finds hosts that we should block from the Disconnect json.
+def get_domains_from_filters(parser, which_dnt, list_categories, desired_tags):
+    """Apply filters to the Disconnect list to return a set of matching domains
 
     Args:
-      blocklist_json: A JSON blob containing Disconnect's list.
-      allow_list: Hosts that we can't put on the blocklist.
-      chunk: The chunk number to use.
-      output_file: A file-handle to the output file.
+      parser : A DisconnectParser instance
       log_file: A filehandle to the log file.
       which_dnt: A filter to restrict output to section of the list with the
           specified DNT tag.
       list_categories : A filter to restrict output to the specified top-level
           categories.
-      name : The section name from `shavar_list_creation.ini`
-      output_name : The output filename from `shavar_list_creation.ini`
       desired_tags : A filter to restrict output to sections of the list with
           the specified sub-category tags.
+    """
+    output = parser.get_domains_with_category(list_categories.split(','))
+    print(" * found %d rules found with categories %s" %
+          (len(output), list_categories))
+
+    # Filter by DNT tag
+    # The DNT tags are used to further filter the list, as well as to
+    # filter tagged domains out of a list that doesn't specify a tag.
+    if which_dnt == "":
+        result = parser.get_domains_with_tag(["w3c", "eff"])
+        output = output.difference(result)
+        print(" * removing %d rule(s) due to DNT exceptions" % len(result))
+    else:
+        result = parser.get_domains_with_tag(which_dnt)
+        output = output.intersection(result)
+        print(" * found %d rule(s) with DNT filter %s. Filtered output to %d" %
+              (len(result), which_dnt, len(output)))
+
+    # Filter by category tag
+    # Unlike DNT, category tags are only used for further filtering the list
+    # and are not used to filter tagged domains out of lists that don't filter
+    # by tag.
+    if len(desired_tags) > 0:
+        result = parser.get_domains_with_tag(desired_tags)
+        output = output.intersection(result)
+        print(" * found %d rule(s) with filter %s. Filtered output to %d." %
+              (len(result), desired_tags, len(output)))
+
+    return output
+
+
+def write_safebrowsing_blocklist(domains, output_name, allow_list, log_file,
+                                 chunk, output_file, name):
+    """Generates safebrowsing-compatible blocklist from a set of `domains`.
+
+    Args:
+      domains: a list of hostnames and/or hostname+paths to add to blocklist
+      allow_list: Hosts that we can't put on the blocklist.
+      chunk: The chunk number to use.
+      output_file: A file-handle to the output file.
+      log_file: A filehandle to the log file.
+      name : The section name from `shavar_list_creation.ini`
+      output_name : The output filename from `shavar_list_creation.ini`
     """
     # Number of items published
     publishing = 0
@@ -263,75 +305,28 @@ def find_hosts(blocklist_json, allow_list, chunk, output_file, log_file,
         hashdata_bytes += 32
         publishing += 1
 
-    categories = blocklist_json["categories"]
-
-    for c in list_categories.split(","):
-        if log_file:
-            log_file.write("Processing %s\n" % c)
-
-        # Objects of type
-        # { Automattic: { http://automattic.com: [polldaddy.com] }}
-        # Domain lists may or may not contain the address of the top-level site
-        for org in categories[c]:
-            for orgname in org:
-                org_json = org[orgname]
-
-                # Skip organization if it doesn't have the desired
-                # dnt annotation
-                dnt_value = org_json.pop('dnt', '')
-                assert dnt_value in ["w3c", "eff", ""]
-                if dnt_value != which_dnt:
-                    continue
-
-                # Skip organization if it doesn't have the desired
-                # sub-category tag
-                observed_tags = {""}
-                for tag in ALL_TAGS:
-                    tag_value = org_json.pop(tag, '')
-                    assert tag_value in ["true", ""]
-                    if tag_value == "":
-                        continue
-                    observed_tags.add(tag)
-                if len(desired_tags.intersection(observed_tags)) == 0:
-                    continue
-
-                for top in org_json:
-                    domains = org_json[top]
-                    for d in domains:
-                        d = d.encode('utf-8')
-                        if c == "Disconnect":
-                            try:
-                                if not disconnect_mapping[d] in list_categories:  # noqa
-                                    continue
-                            except KeyError:
-                                sys.stderr.write(
-                                    "[ERROR] %s not found in "
-                                    "disconnect_mapping\n" % d
-                                )
-                        added = add_domain_to_list(
-                            d, previous_domains, allow_list, log_file, output
-                        )
-                        if added:
-                            # TODO?: hashdata_bytes += hashdata.digest_size
-                            hashdata_bytes += 32
-                            publishing += 1
+    for d in domains:
+        added = add_domain_to_list(
+            d, previous_domains, allow_list, log_file, output
+        )
+        if added:
+            # TODO?: hashdata_bytes += hashdata.digest_size
+            hashdata_bytes += 32
+            publishing += 1
 
     # Write safebrowsing-list format header
-    if output_file:
-        output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
     output_string = "a:%u:32:%s\n" % (chunk, hashdata_bytes)
-    for o in output:
-        if output_file:
-            output_file.write(o)
-        output_string = output_string + o
+    output_string += ''.join(output)
+    if output_file:
+        output_file.write(output_string)
 
     if (name in FASTBLOCK_SECTIONS):
-        print "Fastblock(%s): publishing %d items; file size %d" % (
-            name, publishing, len(output_string))
+        print("Fastblock(%s): publishing %d items; file size %d" % (
+            name, publishing, len(output_string)))
     else:
-        print "Tracking protection(%s): publishing %d items; file size %d" \
-            % (name, publishing, len(output_string))
-    return output_string
+        print("Tracking protection(%s): publishing %d items; file size %d" % (
+            name, publishing, len(output_string)))
+    return
 
 
 def process_entity_whitelist(incoming, chunk, output_file,
@@ -372,11 +367,11 @@ def process_entity_whitelist(incoming, chunk, output_file,
     output_file.flush()
     output_size = os.fstat(output_file.fileno()).st_size
     if(list_variant in FASTBLOCK_SECTIONS):
-        print "Fastblock whitelist(%s): publishing %d items; file size %d" % (
-            list_variant, publishing, output_size)
+        print("Fastblock whitelist(%s): publishing %d items; file size %d" % (
+            list_variant, publishing, output_size))
     else:
-        print "Entity whitelist(%s): publishing %d items; file size %d" \
-            % (list_variant, publishing, output_size)
+        print("Entity whitelist(%s): publishing %d items; file size %d" % (
+            list_variant, publishing, output_size))
 
 
 def process_plugin_blocklist(incoming, chunk, output_file, log_file,
@@ -406,8 +401,8 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
 
     output_file.flush()
     output_size = os.fstat(output_file.fileno()).st_size
-    print "Plugin blocklist(%s): publishing %d items; file size %d" \
-        % (list_variant, publishing, output_size)
+    print("Plugin blocklist(%s): publishing %d items; file size %d" % (
+        list_variant, publishing, output_size))
 
 
 def chunk_metadata(fp):
@@ -474,12 +469,14 @@ def main():
         if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
             if (section in FASTBLOCK_SECTIONS):
                 # process fastblock
-                blocklist_json = load_json_from_url(
-                    config, section, "blocklist_url")
+                blocklist_url = get_list_url(config, section, "blocklist_url")
             else:
                 # process disconnect
-                blocklist_json = load_json_from_url(
-                    config, section, "disconnect_url")
+                blocklist_url = get_list_url(config, section, "disconnect_url")
+            parser = DisconnectParser(
+                blocklist_url=blocklist_url,
+                disconnect_mapping=DISCONNECT_MAPPING
+            )
 
             output_file, log_file = get_output_and_log_files(config, section)
 
@@ -522,11 +519,14 @@ def main():
             except ConfigParser.NoOptionError:
                 desired_tags = DEFAULT_DISCONNECT_LIST_TAGS
 
+            print("\n------ %s ------" % section)
+            print("-->blocklist: %s)" % blocklist_url)
+            blocked_domains = get_domains_from_filters(
+                parser, which_dnt, list_categories, desired_tags)
             output_filename = config.get(section, "output")
-            find_hosts(
-                blocklist_json, allowed, chunknum, output_file, log_file,
-                which_dnt, list_categories, section, output_filename,
-                desired_tags
+            write_safebrowsing_blocklist(
+                blocked_domains, output_filename, allowed, log_file,
+                chunknum, output_file, section
             )
 
         if section in PLUGIN_SECTIONS:
@@ -569,12 +569,12 @@ def main():
 
         with open(config.get(section, 'output'), 'rb') as blob:
             if not new_data_to_publish(config, section, blob):
-                print "No new data to publish for %s" % section
+                print("No new data to publish for %s" % section)
                 continue
 
         if (config.has_option(section, "s3_upload")
                 and not config.getboolean(section, "s3_upload")):
-            print "Skipping S3 upload for %s" % section
+            print("Skipping S3 upload for %s" % section)
             continue
 
         bucket = config.get("main", "s3_bucket")
@@ -602,7 +602,7 @@ def main():
             k = boto.s3.key.Key(bucket)
             k.key = key_name
             k.set_contents_from_filename(output_filename)
-        print "Uploaded to s3: %s" % section
+        print("Uploaded to s3: %s" % section)
 
 
 if __name__ == "__main__":
