@@ -1,4 +1,10 @@
+# pipenv
+Pipfile*
+
+# Output and test files
 /shavar_list_creation.ini
+prod.ini
+stage.ini
 *.log
 *-digest256
 
