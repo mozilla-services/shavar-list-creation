@@ -115,7 +115,8 @@ ALL_TAGS = {
 
 TEST_DOMAIN_TEMPLATE = '%s.dummytracker.org'
 
-DEFAULT_DISCONNECT_LIST_CATEGORIES = 'Advertising,Analytics,Social,Disconnect'
+DEFAULT_DISCONNECT_LIST_CATEGORIES = [
+    'Advertising|Analytics|Social|Disconnect']
 DEFAULT_DISCONNECT_LIST_TAGS = {}
 
 
@@ -226,45 +227,93 @@ def add_domain_to_list(domain, previous_domains, allow_list, log_file, output):
     return True
 
 
-def get_domains_from_filters(parser, which_dnt, list_categories, desired_tags):
+def get_domains_from_category_filters(parser, category_filters):
+    if type(category_filters) != list:
+        raise ValueError(
+            "Parameter `category_filters` must be a list of strings. "
+            "You passed %s of type %s" %
+            (category_filters, type(category_filters))
+        )
+    output = parser.get_domains_with_category(category_filters[0])
+    print(" * filter %s matched %d domains"
+          % (category_filters[0], len(output)))
+    for category_filter in category_filters[1:]:
+        result = parser.get_domains_with_category(category_filter)
+        output.intersection_update(result)
+        print(
+            " * filter %s matched %d domains. Reduced set to %d items."
+            % (category_filter, len(result), len(output))
+        )
+    return output
+
+
+def get_domains_from_filters(parser, category_filters,
+                             category_exclusion_filters=[],
+                             dnt_filter="", tag_filters={}):
     """Apply filters to the Disconnect list to return a set of matching domains
 
-    Args:
-      parser : A DisconnectParser instance
-      log_file: A filehandle to the log file.
-      which_dnt: A filter to restrict output to section of the list with the
-          specified DNT tag.
-      list_categories : A filter to restrict output to the specified top-level
-          categories.
-      desired_tags : A filter to restrict output to sections of the list with
-          the specified sub-category tags.
+    Parameters
+    ----------
+    parser : DisconnectParser
+        An instance of the parser set to remap the Disconnect category
+    category_filters : list of list of strings
+        A filter to restrict output to the specified top-level categories.
+        Each filter should be a comma-separated list of top-level categories
+        to restrict the list to. If more than one filter is provided, the
+        intersection of the filters is returned.
+        Example:
+            `[['Advertising', 'Analytics'], ['Fingerprinting']]` will return
+            domains in either the Advertising or Analytics category AND in the
+            Fingerprinting category.
+    category_exclusion_filters : list of list of strings, optional
+        A filter to exclude domains from the specified top-level categories.
+        The list format is the same as `category_filters`.
+    dnt_filter : string, optional
+        A filter to restrict output to section of the list with the
+        specified DNT tag.
+        NOTE: The `dnt_filter` is used to further filter the list, as well as
+        to filter tagged domains out of a list that doesn't specify a tag. Thus
+        lists that use the default ("") will not contain any domain that has
+        a `dnt` tag.
+    tag_filters : set of strings, optional
+        A filter to restrict output to sections of the list with the specified
+        sub-category tags.
+
+    Returns
+    -------
+    set : Domains from `parser` that match the given filters
     """
-    output = parser.get_domains_with_category(list_categories.split(','))
-    print(" * found %d rules found with categories %s" %
-          (len(output), list_categories))
+    # Apply category filters
+    output = get_domains_from_category_filters(parser, category_filters)
+
+    # Apply exclusion filters
+    if len(category_exclusion_filters) > 0:
+        before = len(output)
+        output.difference_update(
+            get_domains_from_category_filters(
+                parser, category_exclusion_filters
+            )
+        )
+        print(" * exclusion filters removed %d domains from output"
+              % (before - len(output)))
 
     # Filter by DNT tag
-    # The DNT tags are used to further filter the list, as well as to
-    # filter tagged domains out of a list that doesn't specify a tag.
-    if which_dnt == "":
+    if dnt_filter == "":
         result = parser.get_domains_with_tag(["w3c", "eff"])
         output = output.difference(result)
         print(" * removing %d rule(s) due to DNT exceptions" % len(result))
     else:
-        result = parser.get_domains_with_tag(which_dnt)
+        result = parser.get_domains_with_tag(dnt_filter)
         output = output.intersection(result)
         print(" * found %d rule(s) with DNT filter %s. Filtered output to %d" %
-              (len(result), which_dnt, len(output)))
+              (len(result), dnt_filter, len(output)))
 
-    # Filter by category tag
-    # Unlike DNT, category tags are only used for further filtering the list
-    # and are not used to filter tagged domains out of lists that don't filter
-    # by tag.
-    if len(desired_tags) > 0:
-        result = parser.get_domains_with_tag(desired_tags)
+    # Apply tag filters
+    if len(tag_filters) > 0:
+        result = parser.get_domains_with_tag(tag_filters)
         output = output.intersection(result)
         print(" * found %d rule(s) with filter %s. Filtered output to %d." %
-              (len(result), desired_tags, len(output)))
+              (len(result), tag_filters, len(output)))
 
     return output
 
@@ -495,11 +544,23 @@ def main():
                         continue
                     allowed.add(line)
 
-            try:
-                list_categories = config.get(section, "disconnect_categories")
-            except ConfigParser.NoOptionError:
+            # category filter
+            if config.has_option(section, "categories"):
+                list_categories = config.get(section, "categories").split(',')
+            else:
                 list_categories = DEFAULT_DISCONNECT_LIST_CATEGORIES
+            list_categories = [x.split('|') for x in list_categories]
 
+            # excluded categories filter
+            if config.has_option(section, "excluded_categories"):
+                excluded_categories = config.get(
+                    section, "excluded_categories").split(',')
+                excluded_categories = [
+                    x.split('|') for x in excluded_categories]
+            else:
+                excluded_categories = list()
+
+            # dnt filter
             if section in DNT_EFF_SECTIONS:
                 which_dnt = "eff"
             elif section in DNT_W3C_SECTIONS:
@@ -507,6 +568,7 @@ def main():
             else:
                 which_dnt = ""
 
+            # tag filter
             try:
                 desired_tags = set(config.get(
                     section, "disconnect_tags").split(','))
@@ -519,10 +581,14 @@ def main():
             except ConfigParser.NoOptionError:
                 desired_tags = DEFAULT_DISCONNECT_LIST_TAGS
 
+            # Retrieve domains that match filters
             print("\n------ %s ------" % section)
             print("-->blocklist: %s)" % blocklist_url)
             blocked_domains = get_domains_from_filters(
-                parser, which_dnt, list_categories, desired_tags)
+                parser, list_categories, excluded_categories,
+                which_dnt, desired_tags)
+
+            # Write blocklist in a format compatible with safe browsing
             output_filename = config.get(section, "output")
             write_safebrowsing_blocklist(
                 blocked_domains, output_filename, allowed, log_file,
