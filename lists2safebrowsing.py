@@ -70,6 +70,7 @@ DNT_SECTIONS = (
     "tracking-protection-social",
     "tracking-protection-base-fingerprinting",
     "tracking-protection-content-fingerprinting",
+    "tracking-protection-experimental-fingerprinting",
     "tracking-protection-base-cryptomining",
     "tracking-protection-content-cryptomining",
     "tracking-protection-test-multitag",
