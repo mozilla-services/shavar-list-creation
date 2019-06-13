@@ -53,6 +53,11 @@ PRE_DNT_SECTIONS = (
     "easylist",
     "easyprivacy",
     "adguard",
+    "social-tracking-protection",
+    "social-tracking-protection-facebook",
+    "social-tracking-protection-twitter",
+    "social-tracking-protection-linkedin",
+    "social-tracking-protection-youtube",
 )
 PRE_DNT_CONTENT_SECTIONS = (
     "tracking-protection-full",
