@@ -747,9 +747,9 @@ def main():
             upload_to_s3 = True
 
         upload_to_remote_setting = False
-        if (config.has_option('main', "remote_setting_upload")
-            and config.getboolean('main', "remote_setting_upload")):
-            upload_to_s3 = True
+        if (config.has_option(section, "remote_setting_upload")
+            and config.getboolean(section, "remote_setting_upload")):
+            upload_to_remote_setting = True
 
         if not upload_to_s3 and not upload_to_remote_setting:
             print("Upload to Remote Setting and S3 disabled.")
