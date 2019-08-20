@@ -664,42 +664,37 @@ def main():
         if section == 'main':
             continue
 
+        upload_to_s3 = False
+        if (config.has_option(section, "s3_upload")
+            and config.getboolean(section, "s3_upload")):
+            upload_to_s3 = True
+
+        upload_to_remote_setting = False
+        if (config.has_option('main', "remote_setting_upload")
+            and config.getboolean('main', "remote_setting_upload")):
+            upload_to_s3 = True
+
+        if not upload_to_s3 and not upload_to_remote_setting:
+            print("Upload to Remote Setting and S3 disabled.")
+            return
+
         with open(config.get(section, 'output'), 'rb') as blob:
-            if not new_data_to_publish(config, section, blob):
+            s3_upload_needed, rs_upload_needed = new_data_to_publish(config, section, blob)
+            if not s3_upload_needed and not rs_upload_needed:
                 print("No new data to publish for %s" % section)
                 continue
 
-        if (config.has_option(section, "s3_upload")
-                and not config.getboolean(section, "s3_upload")):
+        if s3_upload_needed and upload_to_s3:
+            publish_to_s3(config, section, chunknum)
+        else:
             print("Skipping S3 upload for %s" % section)
             continue
 
-        bucket = config.get("main", "s3_bucket")
-        # Override with list specific bucket if necessary
-        if config.has_option(section, "s3_bucket"):
-            bucket = config.get(section, "s3_bucket")
-
-        key = os.path.basename(config.get(section, "output"))
-        # Override with list specific value if necessary
-        if config.has_option(section, "s3_key"):
-            key = config.get(section, "s3_key")
-
-        chunk_key = os.path.join(
-            config.get(section, os.path.basename('output')), str(chunknum))
-
-        if not bucket or not key:
-            sys.stderr.write(
-                "Can't upload to s3 without s3_bucket and s3_key\n")
-            sys.exit(-1)
-
-        output_filename = config.get(section, "output")
-        conn = boto.s3.connection.S3Connection()
-        bucket = conn.get_bucket(bucket)
-        for key_name in (chunk_key, key):
-            k = boto.s3.key.Key(bucket)
-            k.key = key_name
-            k.set_contents_from_filename(output_filename)
-        print("Uploaded to s3: %s" % section)
+        list_name = config.get(section, 'output')
+        if rs_upload_needed and upload_to_remote_setting and list_name == 'social-tracking-protection-facebook':
+            published_to_remote_setting(config, section, chunknum)
+        else:
+            print("Skipping Remote Settings upload for %s" % section)
 
 
 if __name__ == "__main__":
