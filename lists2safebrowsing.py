@@ -502,9 +502,26 @@ def new_data_to_publish(config, section, blob):
 
     new = chunk_metadata(blob)
 
+    s3_upload_needed = False
     if old['checksum'] != new['checksum']:
-        return True
-    return False
+        s3_upload_needed = True
+
+    # Check to see if update is needed on Remote Settings
+    records_url = REMOTE_SETTING_URL + '/v1/buckets/{0}/collections/{1}/records'.format(
+        REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION)
+    resp = requests.get(records_url, auth=('admin', 's3cr3t'))
+    rs_upload_needed = False
+    list_name = config.get(section, 'output')
+    if resp:
+        records = resp.json()['data']
+        for rec in records:
+            if rec['Name'] == list_name:
+                if rec['CheckSum'] != new['checksum']:
+                    rs_upload_needed = True
+                break
+    return s3_upload_needed, rs_upload_needed
+
+
 def publish_to_s3(config, section, chunknum):
     bucket = config.get("main", "s3_bucket")
     # Override with list specific bucket if necessary
