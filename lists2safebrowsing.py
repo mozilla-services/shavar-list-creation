@@ -505,6 +505,32 @@ def new_data_to_publish(config, section, blob):
     if old['checksum'] != new['checksum']:
         return True
     return False
+def publish_to_s3(config, section, chunknum):
+    bucket = config.get("main", "s3_bucket")
+    # Override with list specific bucket if necessary
+    if config.has_option(section, "s3_bucket"):
+        bucket = config.get(section, "s3_bucket")
+
+    key = os.path.basename(config.get(section, "output"))
+    # Override with list specific value if necessary
+    if config.has_option(section, "s3_key"):
+        key = config.get(section, "s3_key")
+
+    chunk_key = os.path.join(
+        config.get(section, os.path.basename('output')), str(chunknum))
+
+    if not bucket or not key:
+        sys.stderr.write(
+            "Can't upload to s3 without s3_bucket and s3_key\n")
+        sys.exit(-1)
+    output_filename = config.get(section, "output")
+    conn = boto.s3.connection.S3Connection()
+    bucket = conn.get_bucket(bucket)
+    for key_name in (chunk_key, key):
+        k = boto.s3.key.Key(bucket)
+        k.key = key_name
+        k.set_contents_from_filename(output_filename)
+    print("Uploaded to s3: %s" % section)
 
 
 def main():
