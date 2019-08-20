@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import requests
 import sys
 import tempfile
 import time
@@ -123,6 +124,12 @@ TEST_DOMAIN_TEMPLATE = '%s.dummytracker.org'
 DEFAULT_DISCONNECT_LIST_CATEGORIES = [
     'Advertising|Analytics|Social|Disconnect']
 DEFAULT_DISCONNECT_LIST_TAGS = {}
+
+CONFIG = ConfigParser.ConfigParser()
+FILENAME = CONFIG.read(["shavar_list_creation.ini"])
+REMOTE_SETTING_URL = CONFIG.get('main', 'remote_setting_url')
+REMOTE_SETTING_BUCKET = CONFIG.get('main', 'remote_setting_bucket')
+REMOTE_SETTING_COLLECTION = CONFIG.get('main', 'remote_setting_collection')
 
 
 def get_output_and_log_files(config, section):
@@ -548,6 +555,59 @@ def publish_to_s3(config, section, chunknum):
         k.key = key_name
         k.set_contents_from_filename(output_filename)
     print("Uploaded to s3: %s" % section)
+
+
+def publish_to_remote_settings(config, section):
+    print('----------Publishing %s to Remote Settings----------' % (section))
+    list_type = ''
+    list_categories = ''
+    if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
+        list_type = 'blocklist'
+        if config.has_option(section, "categories"):
+            list_categories = config.get(section, "categories").split(',')
+        else:
+            list_categories = DEFAULT_DISCONNECT_LIST_CATEGORIES
+        list_categories = [x.split('|') for x in list_categories]
+        print(" * category filters %s applied" % (list_categories))
+        if config.has_option(section, "excluded_categories"):
+            excluded_categories = config.get(
+                section, "excluded_categories").split(',')
+            excluded_categories = [
+                x.split('|') for x in excluded_categories]
+            print(" * exclusion filters %s removed domains from output"
+                  % (excluded_categories))
+    elif (section in PLUGIN_SECTIONS):
+        list_type = 'plugin blocklist'
+    elif (section in WHITELIST_SECTIONS):
+        list_type = 'entity list'
+
+    list_name = config.get(section, 'output')
+    chunk_file = chunk_metadata(open(config.get(section, 'output'), 'rb'))
+    auth = ('admin', 's3cr3t')
+    record_data = {
+        'data': {
+            'Category': str(list_categories),
+            'Type': list_type,
+            'Name': list_name,
+            'CheckSum': chunk_file['CheckSum']
+        }
+    }
+    record_url = REMOTE_SETTING_URL + '/buckets/{0}/collections/{1}/records'.format(
+        REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION)
+    rec_resp = requests.post(record_url, json=record_data, auth=auth)
+    if rec_resp.status_code != 201:
+        print("Failed to create record for %s. Error: %s" %
+              (list_name, rec_resp.content))
+        return
+
+    rec_id = rec_resp.json()['data'].get('id')
+    attachment_url = REMOTE_SETTING_URL + '/buckets/{0}/collections/{1}/records/{2}/attachment'.format(
+        REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION, rec_id)
+    files = [("attachment", open(config.get(section, 'output'), 'rb'))]
+    att_resp = requests.post(attachment_url, files=files, auth=auth)
+
+    import ipdb; ipdb.set_trace()
+    print("Uploaded to remote settings: %s" % list_name)
 
 
 def main():
