@@ -479,7 +479,32 @@ def chunk_metadata(fp):
     )
 
 
-def new_data_to_publish(config, section, blob):
+def new_data_to_publish_to_remote_settings(config, section, new):
+    # Check to see if update is needed on Remote Settings
+    records_url = REMOTE_SETTING_URL + '/buckets/{0}/collections/{1}/records'.format(
+        REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION)
+    resp = requests.get(records_url, auth=('admin', 's3cr3t'))
+    list_name = config.get(section, 'output')
+    # if list_name == 'mozpub-track-digest256':
+    #     import ipdb; ipdb.set_trace()
+    if section == 'tracking-protection-analytics':
+        import ipdb; ipdb.set_trace()
+    if resp.status_code != 200:
+        return False, resp.content
+    records = resp.json()['data']
+    record = {}
+    for rec in records:
+        if rec['Name'] == list_name:
+            record = rec
+            break
+
+    rs_upload_needed = True
+    if record != {} and record.get('CheckSum') == new['checksum']:
+        rs_upload_needed = False
+    return rs_upload_needed, record
+
+
+def new_data_to_publish_to_s3(config, section, new):
     # Get the metadata for our old chunk
 
     # If necessary fetch the existing data from S3, otherwise open a local file
@@ -507,26 +532,11 @@ def new_data_to_publish(config, section, blob):
     old = chunk_metadata(current)
     current.close()
 
-    new = chunk_metadata(blob)
-
     s3_upload_needed = False
     if old['checksum'] != new['checksum']:
         s3_upload_needed = True
 
-    # Check to see if update is needed on Remote Settings
-    records_url = REMOTE_SETTING_URL + '/v1/buckets/{0}/collections/{1}/records'.format(
-        REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION)
-    resp = requests.get(records_url, auth=('admin', 's3cr3t'))
-    rs_upload_needed = False
-    list_name = config.get(section, 'output')
-    if resp:
-        records = resp.json()['data']
-        for rec in records:
-            if rec['Name'] == list_name:
-                if rec['CheckSum'] != new['checksum']:
-                    rs_upload_needed = True
-                break
-    return s3_upload_needed, rs_upload_needed
+    return s3_upload_needed
 
 
 def publish_to_s3(config, section, chunknum):
@@ -756,7 +766,9 @@ def main():
             return
 
         with open(config.get(section, 'output'), 'rb') as blob:
-            s3_upload_needed, rs_upload_needed = new_data_to_publish(config, section, blob)
+            new = chunk_metadata(blob)
+            s3_upload_needed = new_data_to_publish_to_s3(config, section, new)
+            rs_upload_needed, record = new_data_to_publish_to_remote_settings(config, section, new)
             if not s3_upload_needed and not rs_upload_needed:
                 print("No new data to publish for %s" % section)
                 continue
