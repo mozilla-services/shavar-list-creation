@@ -572,7 +572,7 @@ def publish_to_remote_settings(config, section, record):
     list_type = ''
     list_categories = ''
     if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
-        list_type = 'blocklist'
+        list_type = 'Tracker'
         if config.has_option(section, "categories"):
             list_categories = config.get(section, "categories").split(',')
         else:
@@ -587,9 +587,9 @@ def publish_to_remote_settings(config, section, record):
             print(" * exclusion filters %s removed domains from output"
                   % (excluded_categories))
     elif (section in PLUGIN_SECTIONS):
-        list_type = 'plugin blocklist'
+        list_type = 'Plugin'
     elif (section in WHITELIST_SECTIONS):
-        list_type = 'entity list'
+        list_type = 'Entity'
 
     list_name = config.get(section, 'output')
     chunk_file = chunk_metadata(open(config.get(section, 'output'), 'rb'))
