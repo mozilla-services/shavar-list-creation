@@ -599,24 +599,28 @@ def publish_to_remote_settings(config, section):
             'Category': str(list_categories),
             'Type': list_type,
             'Name': list_name,
-            'CheckSum': chunk_file['CheckSum']
+            'CheckSum': chunk_file['checksum']
         }
     }
-    record_url = REMOTE_SETTING_URL + '/buckets/{0}/collections/{1}/records'.format(
-        REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION)
-    rec_resp = requests.post(record_url, json=record_data, auth=auth)
-    if rec_resp.status_code != 201:
-        print("Failed to create record for %s. Error: %s" %
+    if record.get('id'):
+        record_url = REMOTE_SETTING_URL + '/buckets/{0}/collections/{1}/records/{2}'.format(
+            REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION, record['id'])
+        rec_resp = requests.put(record_url, json=record_data, auth=auth)
+    else:
+        record_url = REMOTE_SETTING_URL + '/buckets/{0}/collections/{1}/records'.format(
+            REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION)
+        rec_resp = requests.post(record_url, json=record_data, auth=auth)
+
+    if not rec_resp:
+        print("Failed to create/update record for %s. Error: %s" %
               (list_name, rec_resp.content))
         return
-
-    rec_id = rec_resp.json()['data'].get('id')
+    rec_id = rec_resp.json()['data']['id']
     attachment_url = REMOTE_SETTING_URL + '/buckets/{0}/collections/{1}/records/{2}/attachment'.format(
         REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION, rec_id)
     files = [("attachment", open(config.get(section, 'output'), 'rb'))]
     att_resp = requests.post(attachment_url, files=files, auth=auth)
 
-    import ipdb; ipdb.set_trace()
     print("Uploaded to remote settings: %s" % list_name)
 
 
@@ -777,11 +781,10 @@ def main():
             publish_to_s3(config, section, chunknum)
         else:
             print("Skipping S3 upload for %s" % section)
-            continue
 
         list_name = config.get(section, 'output')
-        if rs_upload_needed and upload_to_remote_setting and list_name == 'social-tracking-protection-facebook':
-            published_to_remote_setting(config, section, chunknum)
+        if rs_upload_needed and upload_to_remote_setting and section == 'tracking-protection-analytics':
+            publish_to_remote_settings(config, section, record)
         else:
             print("Skipping Remote Settings upload for %s" % section)
 
