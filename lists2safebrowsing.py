@@ -567,7 +567,7 @@ def publish_to_s3(config, section, chunknum):
     print("Uploaded to s3: %s" % section)
 
 
-def publish_to_remote_settings(config, section):
+def publish_to_remote_settings(config, section, record):
     print('----------Publishing %s to Remote Settings----------' % (section))
     list_type = ''
     list_categories = ''
