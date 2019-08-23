@@ -35,11 +35,7 @@ from constants import (
 
 )
 from publish2cloud import (
-    chunk_metadata,
-    new_data_to_publish_to_remote_settings,
-    new_data_to_publish_to_s3,
-    publish_to_s3,
-    publish_to_remote_settings,
+    publish_to_cloud
 )
 
 updatePSL()
@@ -508,44 +504,7 @@ def main():
     if log_file:
         log_file.close()
 
-    # Optionally upload to S3. If s3_upload is set, then s3_bucket and s3_key
-    # must be set.
-    for section in config.sections():
-        if section == 'main':
-            continue
-
-        upload_to_s3 = False
-        if (config.has_option(section, "s3_upload")
-            and config.getboolean(section, "s3_upload")):
-            upload_to_s3 = True
-
-        upload_to_remote_setting = False
-        if (config.has_option(section, "remote_setting_upload")
-            and config.getboolean(section, "remote_setting_upload")):
-            upload_to_remote_setting = True
-
-        if not upload_to_s3 and not upload_to_remote_setting:
-            print("Upload to Remote Setting and S3 disabled.")
-            return
-
-        with open(config.get(section, 'output'), 'rb') as blob:
-            new = chunk_metadata(blob)
-            s3_upload_needed = new_data_to_publish_to_s3(config, section, new)
-            rs_upload_needed, record = new_data_to_publish_to_remote_settings(config, section, new)
-            if not s3_upload_needed and not rs_upload_needed:
-                print("No new data to publish for %s" % section)
-                continue
-
-        if s3_upload_needed and upload_to_s3:
-            publish_to_s3(config, section, chunknum)
-        else:
-            print("Skipping S3 upload for %s" % section)
-
-        list_name = config.get(section, 'output')
-        if rs_upload_needed and upload_to_remote_setting and section == 'tracking-protection-analytics':
-            publish_to_remote_settings(config, section, record)
-        else:
-            print("Skipping Remote Settings upload for %s" % section)
+    publish_to_cloud(config)
 
 
 if __name__ == "__main__":
