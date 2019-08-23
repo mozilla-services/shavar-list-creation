@@ -15,6 +15,10 @@ FILENAME = CONFIG.read(["shavar_list_creation.ini"])
 REMOTE_SETTING_URL = CONFIG.get('main', 'remote_setting_url')
 REMOTE_SETTING_BUCKET = CONFIG.get('main', 'remote_setting_bucket')
 REMOTE_SETTING_COLLECTION = CONFIG.get('main', 'remote_setting_collection')
+REMOTE_SETTINGS_RECORD_PATH = '/buckets/{bucket_name}/collections/{collection_name}/records'
+REMOTE_SETTING_RECORD_URL = REMOTE_SETTING_URL + REMOTE_SETTINGS_RECORD_PATH.format(
+        bucket_name=REMOTE_SETTING_BUCKET,
+        collection_name=REMOTE_SETTING_COLLECTION)
 
 def chunk_metadata(fp):
     # Read the first 25 bytes and look for a new line.  Since this is a file
@@ -30,8 +34,7 @@ def chunk_metadata(fp):
 
 def new_data_to_publish_to_remote_settings(config, section, new):
     # Check to see if update is needed on Remote Settings
-    records_url = REMOTE_SETTING_URL + '/buckets/{0}/collections/{1}/records'.format(
-        REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION)
+    records_url = REMOTE_SETTING_RECORD_URL
     resp = requests.get(records_url, auth=('admin', 's3cr3t'))
     list_name = config.get(section, 'output')
     # if list_name == 'mozpub-track-digest256':
@@ -153,21 +156,21 @@ def publish_to_remote_settings(config, section, record):
         }
     }
     if record.get('id'):
-        record_url = REMOTE_SETTING_URL + '/buckets/{0}/collections/{1}/records/{2}'.format(
-            REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION, record['id'])
+        record_url = (REMOTE_SETTING_RECORD_URL + '/{record_id}').format(
+            record_id=record['id'])
         rec_resp = requests.put(record_url, json=record_data, auth=auth)
     else:
-        record_url = REMOTE_SETTING_URL + '/buckets/{0}/collections/{1}/records'.format(
-            REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION)
-        rec_resp = requests.post(record_url, json=record_data, auth=auth)
+        rec_resp = requests.post(
+            REMOTE_SETTING_RECORD_URL, json=record_data, auth=auth)
 
     if not rec_resp:
         print("Failed to create/update record for %s. Error: %s" %
               (list_name, rec_resp.content))
         return
     rec_id = rec_resp.json()['data']['id']
-    attachment_url = REMOTE_SETTING_URL + '/buckets/{0}/collections/{1}/records/{2}/attachment'.format(
-        REMOTE_SETTING_BUCKET, REMOTE_SETTING_COLLECTION, rec_id)
+    attachment_url = (
+        REMOTE_SETTING_RECORD_URL + '/{record_id}/attachment').format(
+            record_id=rec_id)
     files = [("attachment", open(config.get(section, 'output'), 'rb'))]
     att_resp = requests.post(attachment_url, files=files, auth=auth)
 
