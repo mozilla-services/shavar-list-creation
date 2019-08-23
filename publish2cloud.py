@@ -32,6 +32,18 @@ def chunk_metadata(fp):
         checksum=hashlib.sha256(fp.read()).hexdigest()
     )
 
+
+def check_upload_remote_settings_config(config, section):
+    if config.has_option(section, "remote_setting_upload"):
+        # if it exists, the specfic section's upload config is prioritized
+        return config.getboolean(section, "remote_setting_upload")
+
+    if config.has_option("main", "remote_setting_upload"):
+        # if it exists, the deafult config is used
+        return config.getboolean("main", "remote_setting_upload")
+    return False
+
+
 def new_data_to_publish_to_remote_settings(config, section, new):
     # Check to see if update is needed on Remote Settings
     records_url = REMOTE_SETTING_RECORD_URL
