@@ -130,23 +130,23 @@ def publish_to_s3(config, section, chunknum):
 
 def publish_to_remote_settings(config, section, record):
     list_type = ''
-    list_categories = ''
+    categories = []
+    excluded_categories = []
     if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
         list_type = 'Tracker'
         if config.has_option(section, "categories"):
             list_categories = config.get(section, "categories").split(',')
         else:
             list_categories = DEFAULT_DISCONNECT_LIST_CATEGORIES
-        list_categories = [x.split('|') for x in list_categories]
-        print(" * category filters %s applied" % (list_categories))
+        categories = []
+        for x in list_categories:
+            categories.extend(x.split('|'))
+
         if config.has_option(section, "excluded_categories"):
-            excluded_categories = config.get(
+            excluded = config.get(
                 section, "excluded_categories").split(',')
-            excluded_categories = [
-                x.split('|') for x in excluded_categories]
-            print(" * exclusion filters %s removed domains from output"
-                  % (excluded_categories))
-        import ipdb; ipdb.set_trace()
+            for x in excluded:
+                excluded_categories.extend(x.split('|'))
     elif (section in PLUGIN_SECTIONS):
         list_type = 'Plugin'
     elif (section in WHITELIST_SECTIONS):
@@ -157,7 +157,8 @@ def publish_to_remote_settings(config, section, record):
     auth = ('admin', 's3cr3t')
     record_data = {
         'data': {
-            'Category': str(list_categories),
+            'Categories': categories,
+            'ExcludedCategories': excluded_categories,
             'Type': list_type,
             'Name': list_name,
             'CheckSum': chunk_file['checksum']
