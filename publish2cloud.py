@@ -49,10 +49,7 @@ def new_data_to_publish_to_remote_settings(config, section, new):
     records_url = REMOTE_SETTING_RECORD_URL
     resp = requests.get(records_url, auth=('admin', 's3cr3t'))
     list_name = config.get(section, 'output')
-    # if list_name == 'mozpub-track-digest256':
-    #     import ipdb; ipdb.set_trace()
-    if section == 'tracking-protection-analytics':
-        import ipdb; ipdb.set_trace()
+
     if resp.status_code != 200:
         return False, resp.content
     records = resp.json()['data']
@@ -132,7 +129,6 @@ def publish_to_s3(config, section, chunknum):
 
 
 def publish_to_remote_settings(config, section, record):
-    print('----------Publishing %s to Remote Settings----------' % (section))
     list_type = ''
     list_categories = ''
     if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
@@ -222,7 +218,6 @@ def publish_to_cloud(config):
             print("Skipping S3 upload for %s" % section)
 
         list_name = config.get(section, 'output')
-        if rs_upload_needed and upload_to_remote_setting and section == 'tracking-protection-analytics':
             publish_to_remote_settings(config, section, record)
         else:
             print("Skipping Remote Settings upload for %s" % section)
