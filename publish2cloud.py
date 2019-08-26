@@ -219,6 +219,7 @@ def publish_to_cloud(config):
             print("Skipping S3 upload for %s" % section)
 
         list_name = config.get(section, 'output')
+        if rs_upload_needed and upload_to_remote_setting:
             publish_to_remote_settings(config, section, record)
         else:
             print("Skipping Remote Settings upload for %s" % section)
