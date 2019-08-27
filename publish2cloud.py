@@ -48,13 +48,13 @@ def get_record_remote_settings(id):
 
 
 def check_upload_remote_settings_config(config, section):
-    if config.has_option(section, "remote_setting_upload"):
+    if config.has_option(section, "remote_settings_upload"):
         # if it exists, the specfic section's upload config is prioritized
-        return config.getboolean(section, "remote_setting_upload")
+        return config.getboolean(section, "remote_settings_upload")
 
-    if config.has_option("main", "remote_setting_upload"):
+    if config.has_option("main", "remote_settings_upload"):
         # if it exists, the deafult config is used
-        return config.getboolean("main", "remote_setting_upload")
+        return config.getboolean("main", "remote_settings_upload")
     return False
 
 
