@@ -23,11 +23,6 @@ REMOTE_SETTINGS_BUCKET = CONFIG.get('main', 'remote_settings_bucket')
 REMOTE_SETTINGS_COLLECTION = CONFIG.get('main', 'remote_settings_collection')
 REMOTE_SETTINGS_RECORD_PATH = ('/buckets/{bucket_name}'
                                + '/collections/{collection_name}/records')
-REMOTE_SETTINGS_RECORD_URL = (
-    REMOTE_SETTINGS_URL
-    + REMOTE_SETTINGS_RECORD_PATH.format(
-        bucket_name=REMOTE_SETTINGS_BUCKET,
-        collection_name=REMOTE_SETTINGS_COLLECTION))
 REMOTE_SETTINGS_AUTH = (CONFIG.get('main', 'remote_settings_username'),
                         CONFIG.get('main', 'remote_settings_password'))
 
@@ -43,6 +38,16 @@ def chunk_metadata(fp):
         type=chunktype, num=chunknum, hash_size=hash_size, len=data_len,
         checksum=hashlib.sha256(fp.read()).hexdigest()
     )
+
+
+def make_record_url_remote_settings(id):
+    remote_settings_record_url = (
+        REMOTE_SETTINGS_URL
+        + REMOTE_SETTINGS_RECORD_PATH.format(
+            bucket_name=REMOTE_SETTINGS_BUCKET,
+            collection_name=REMOTE_SETTINGS_COLLECTION)
+    )
+    return remote_settings_record_url + '/{record_id}'.format(record_id=id)
 
 
 def get_record_remote_settings(id):
