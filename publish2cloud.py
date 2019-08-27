@@ -148,7 +148,7 @@ def publish_to_s3(config, section, chunknum):
     print("Uploaded to s3: %s" % section)
 
 
-def publish_to_remote_settings(config, section, record):
+def publish_to_remote_settings(config, section):
     list_type = ''
     categories = []
     excluded_categories = []
@@ -174,15 +174,13 @@ def publish_to_remote_settings(config, section, record):
 
     list_name = config.get(section, 'output')
     chunk_file = chunk_metadata(open(config.get(section, 'output'), 'rb'))
-    auth = ('admin', 's3cr3t')
     record_data = {
-        'data': {
-            'Categories': categories,
-            'ExcludedCategories': excluded_categories,
-            'Type': list_type,
-            'Name': list_name,
-            'CheckSum': chunk_file['checksum']
-        }
+        'id': list_name,
+        'Categories': categories,
+        'ExcludedCategories': excluded_categories,
+        'Type': list_type,
+        'Name': list_name,
+        'CheckSum': chunk_file['checksum']
     }
     put_new_record_remote_settings(config, section, record_data)
     print("Uploaded to remote settings: %s" % list_name)
@@ -222,6 +220,6 @@ def publish_to_cloud(config):
 
         list_name = config.get(section, 'output')
         if rs_upload_needed and upload_to_remote_setting:
-            publish_to_remote_settings(config, section, record)
+            publish_to_remote_settings(config, section)
         else:
             print("Skipping Remote Settings upload for %s" % section)
