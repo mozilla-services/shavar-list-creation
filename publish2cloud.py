@@ -15,12 +15,16 @@ FILENAME = CONFIG.read(["shavar_list_creation.ini"])
 REMOTE_SETTINGS_URL = CONFIG.get('main', 'remote_settings_url')
 REMOTE_SETTINGS_BUCKET = CONFIG.get('main', 'remote_settings_bucket')
 REMOTE_SETTINGS_COLLECTION = CONFIG.get('main', 'remote_settings_collection')
-REMOTE_SETTINGS_RECORD_PATH = '/buckets/{bucket_name}/collections/{collection_name}/records'
-REMOTE_SETTINGS_RECORD_URL = REMOTE_SETTINGS_URL + REMOTE_SETTINGS_RECORD_PATH.format(
+REMOTE_SETTINGS_RECORD_PATH = ('/buckets/{bucket_name}'
+                               + '/collections/{collection_name}/records')
+REMOTE_SETTINGS_RECORD_URL = (
+    REMOTE_SETTINGS_URL
+    + REMOTE_SETTINGS_RECORD_PATH.format(
         bucket_name=REMOTE_SETTINGS_BUCKET,
-        collection_name=REMOTE_SETTINGS_COLLECTION)
+        collection_name=REMOTE_SETTINGS_COLLECTION))
 REMOTE_SETTINGS_AUTH = (CONFIG.get('main', 'remote_settings_username'),
                         CONFIG.get('main', 'remote_settings_password'))
+
 
 def chunk_metadata(fp):
     # Read the first 25 bytes and look for a new line.  Since this is a file
@@ -36,8 +40,8 @@ def chunk_metadata(fp):
 
 
 def get_record_remote_settings(id):
-    record_url = (REMOTE_SETTINGS_RECORD_URL + '/{record_id}').format(
-        record_id=id)
+    record_url = (REMOTE_SETTINGS_RECORD_URL
+                  + '/{record_id}'.format(record_id=id))
     resp = requests.get(record_url, auth=REMOTE_SETTINGS_AUTH)
     if not resp:
         print("{0} looks like it hasn't been uploaded to "
@@ -48,16 +52,16 @@ def get_record_remote_settings(id):
 
 
 def put_new_record_remote_settings(config, section, data):
-    record_url = (REMOTE_SETTINGS_RECORD_URL + '/{record_id}').format(
-        record_id=data['id'])
+    record_url = (REMOTE_SETTINGS_RECORD_URL
+                  + '/{record_id}'.format(record_id=data['id']))
     rec_resp = requests.put(
         record_url, json={'data': data}, auth=REMOTE_SETTINGS_AUTH)
 
     if not rec_resp:
         print("Failed to create/update record for %s. Error: %s" %
-              (list_name, rec_resp.content))
+              (data['Name'], rec_resp.content))
         return
-    rec_id = rec_resp.json()['data']['id']
+
     attachment_url = record_url + '/attachment'
     files = [("attachment", open(config.get(section, 'output'), 'rb'))]
     att_resp = requests.post(
@@ -164,7 +168,8 @@ def publish_to_remote_settings(config, section):
 
         if config.has_option(section, "excluded_categories"):
             excluded = config.get(
-                section, "excluded_categories").split(',')
+                    section, "excluded_categories"
+                ).split(',')
             for x in excluded:
                 excluded_categories.extend(x.split('|'))
     elif (section in PLUGIN_SECTIONS):
@@ -195,7 +200,7 @@ def publish_to_cloud(config):
 
         upload_to_s3 = False
         if (config.has_option(section, "s3_upload")
-            and config.getboolean(section, "s3_upload")):
+                and config.getboolean(section, "s3_upload")):
             upload_to_s3 = True
 
         upload_to_remote_setting = check_upload_remote_settings_config(
@@ -208,7 +213,8 @@ def publish_to_cloud(config):
         with open(config.get(section, 'output'), 'rb') as blob:
             new = chunk_metadata(blob)
             s3_upload_needed = new_data_to_publish_to_s3(config, section, new)
-            rs_upload_needed = new_data_to_publish_to_remote_settings(config, section, new)
+            rs_upload_needed = new_data_to_publish_to_remote_settings(
+                config, section, new)
             if not s3_upload_needed and not rs_upload_needed:
                 print("No new data to publish for %s" % section)
                 continue
@@ -218,7 +224,6 @@ def publish_to_cloud(config):
         else:
             print("Skipping S3 upload for %s" % section)
 
-        list_name = config.get(section, 'output')
         if rs_upload_needed and upload_to_remote_setting:
             publish_to_remote_settings(config, section)
         else:
