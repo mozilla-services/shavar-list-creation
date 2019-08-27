@@ -16,8 +16,8 @@ from constants import (
     WHITELIST_SECTIONS,
 )
 
-CONFIG = ConfigParser.ConfigParser()
-FILENAME = CONFIG.read(["shavar_list_creation.ini"])
+CONFIG = ConfigParser.SafeConfigParser(os.environ)
+FILENAME = CONFIG.read(['shavar_list_creation.ini'])
 REMOTE_SETTINGS_URL = CONFIG.get('main', 'remote_settings_url')
 REMOTE_SETTINGS_BUCKET = CONFIG.get('main', 'remote_settings_bucket')
 REMOTE_SETTINGS_COLLECTION = CONFIG.get('main', 'remote_settings_collection')
