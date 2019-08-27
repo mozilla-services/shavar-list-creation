@@ -12,13 +12,15 @@ from constants import (
 
 CONFIG = ConfigParser.ConfigParser()
 FILENAME = CONFIG.read(["shavar_list_creation.ini"])
-REMOTE_SETTING_URL = CONFIG.get('main', 'remote_setting_url')
-REMOTE_SETTING_BUCKET = CONFIG.get('main', 'remote_setting_bucket')
-REMOTE_SETTING_COLLECTION = CONFIG.get('main', 'remote_setting_collection')
+REMOTE_SETTINGS_URL = CONFIG.get('main', 'remote_settings_url')
+REMOTE_SETTINGS_BUCKET = CONFIG.get('main', 'remote_settings_bucket')
+REMOTE_SETTINGS_COLLECTION = CONFIG.get('main', 'remote_settings_collection')
 REMOTE_SETTINGS_RECORD_PATH = '/buckets/{bucket_name}/collections/{collection_name}/records'
-REMOTE_SETTING_RECORD_URL = REMOTE_SETTING_URL + REMOTE_SETTINGS_RECORD_PATH.format(
-        bucket_name=REMOTE_SETTING_BUCKET,
-        collection_name=REMOTE_SETTING_COLLECTION)
+REMOTE_SETTINGS_RECORD_URL = REMOTE_SETTINGS_URL + REMOTE_SETTINGS_RECORD_PATH.format(
+        bucket_name=REMOTE_SETTINGS_BUCKET,
+        collection_name=REMOTE_SETTINGS_COLLECTION)
+REMOTE_SETTINGS_AUTH = (CONFIG.get('main', 'remote_settings_username'),
+                        CONFIG.get('main', 'remote_settings_password'))
 
 def chunk_metadata(fp):
     # Read the first 25 bytes and look for a new line.  Since this is a file
