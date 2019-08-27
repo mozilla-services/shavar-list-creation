@@ -504,7 +504,7 @@ def main():
     if log_file:
         log_file.close()
 
-    publish_to_cloud(config)
+    publish_to_cloud(config, chunknum)
 
 
 if __name__ == "__main__":

@@ -191,7 +191,7 @@ def publish_to_remote_settings(config, section):
     print("Uploaded to remote settings: %s" % list_name)
 
 
-def publish_to_cloud(config):
+def publish_to_cloud(config, chunknum):
     # Optionally upload to S3. If s3_upload is set, then s3_bucket and s3_key
     # must be set.
     for section in config.sections():
