@@ -221,7 +221,8 @@ def publish_to_cloud(config, chunknum):
             new = chunk_metadata(blob)
             s3_upload_needed = new_data_to_publish_to_s3(config, section, new)
             rs_upload_needed = new_data_to_publish_to_remote_settings(
-                config, section, new)
+                config, section, new
+            )
             if not s3_upload_needed and not rs_upload_needed:
                 print('No new data to publish for %s' % section)
                 continue
