@@ -6,12 +6,9 @@ import json
 import os
 import re
 import sys
-import tempfile
 import time
 import urllib2
 
-import boto.s3.connection
-import boto.s3.key
 from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
 
@@ -22,13 +19,11 @@ from constants import (
     DEFAULT_DISCONNECT_LIST_CATEGORIES,
     DEFAULT_DISCONNECT_LIST_TAGS,
     DNT_BLANK_SECTIONS,
-    DNT_CONTENT_SECTIONS,
     DNT_EFF_SECTIONS,
     DNT_SECTIONS,
     DNT_W3C_SECTIONS,
     FASTBLOCK_SECTIONS,
     PLUGIN_SECTIONS,
-    PRE_DNT_CONTENT_SECTIONS,
     PRE_DNT_SECTIONS,
     TEST_DOMAIN_TEMPLATE,
     WHITELIST_SECTIONS,

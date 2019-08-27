@@ -1,6 +1,12 @@
 import ConfigParser
 import hashlib
+import os
 import requests
+import sys
+import tempfile
+
+import boto.s3.connection
+import boto.s3.key
 
 from constants import (
     DEFAULT_DISCONNECT_LIST_CATEGORIES,
