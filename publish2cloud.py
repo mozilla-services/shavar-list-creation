@@ -47,6 +47,23 @@ def get_record_remote_settings(id):
     return record
 
 
+def put_new_record_remote_settings(config, section, data):
+    record_url = (REMOTE_SETTINGS_RECORD_URL + '/{record_id}').format(
+        record_id=data['id'])
+    rec_resp = requests.put(
+        record_url, json={'data': data}, auth=REMOTE_SETTINGS_AUTH)
+
+    if not rec_resp:
+        print("Failed to create/update record for %s. Error: %s" %
+              (list_name, rec_resp.content))
+        return
+    rec_id = rec_resp.json()['data']['id']
+    attachment_url = record_url + '/attachment'
+    files = [("attachment", open(config.get(section, 'output'), 'rb'))]
+    att_resp = requests.post(
+        attachment_url, files=files, auth=REMOTE_SETTINGS_AUTH)
+
+
 def check_upload_remote_settings_config(config, section):
     if config.has_option(section, "remote_settings_upload"):
         # if it exists, the specfic section's upload config is prioritized
@@ -167,25 +184,7 @@ def publish_to_remote_settings(config, section, record):
             'CheckSum': chunk_file['checksum']
         }
     }
-    if record.get('id'):
-        record_url = (REMOTE_SETTING_RECORD_URL + '/{record_id}').format(
-            record_id=record['id'])
-        rec_resp = requests.put(record_url, json=record_data, auth=auth)
-    else:
-        rec_resp = requests.post(
-            REMOTE_SETTING_RECORD_URL, json=record_data, auth=auth)
-
-    if not rec_resp:
-        print("Failed to create/update record for %s. Error: %s" %
-              (list_name, rec_resp.content))
-        return
-    rec_id = rec_resp.json()['data']['id']
-    attachment_url = (
-        REMOTE_SETTING_RECORD_URL + '/{record_id}/attachment').format(
-            record_id=rec_id)
-    files = [("attachment", open(config.get(section, 'output'), 'rb'))]
-    att_resp = requests.post(attachment_url, files=files, auth=auth)
-
+    put_new_record_remote_settings(config, section, record_data)
     print("Uploaded to remote settings: %s" % list_name)
 
 
