@@ -91,7 +91,7 @@ def new_data_to_publish_to_remote_settings(config, section, new):
     record = get_record_remote_settings(config.get(section, 'output'))
 
     rs_upload_needed = True
-    if record and record.get('CheckSum') == new['checksum']:
+    if record and record.get('Checksum') == new['checksum']:
         rs_upload_needed = False
     return rs_upload_needed
 
@@ -192,7 +192,7 @@ def publish_to_remote_settings(config, section):
         'ExcludedCategories': excluded_categories,
         'Type': list_type,
         'Name': list_name,
-        'CheckSum': chunk_file['checksum']
+        'Checksum': chunk_file['checksum']
     }
     put_new_record_remote_settings(config, section, record_data)
     print("Uploaded to remote settings: %s" % list_name)
