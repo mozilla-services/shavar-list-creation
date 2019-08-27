@@ -66,12 +66,13 @@ def put_new_record_remote_settings(config, section, data):
     if not rec_resp:
         print("Failed to create/update record for %s. Error: %s" %
               (data['Name'], rec_resp.content))
-        return
+        return rec_resp
 
     attachment_url = record_url + '/attachment'
     files = [("attachment", open(config.get(section, 'output'), 'rb'))]
     att_resp = requests.post(
         attachment_url, files=files, auth=REMOTE_SETTINGS_AUTH)
+    return att_resp
 
 
 def check_upload_remote_settings_config(config, section):
