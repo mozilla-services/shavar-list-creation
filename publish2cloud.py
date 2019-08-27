@@ -51,8 +51,7 @@ def make_record_url_remote_settings(id):
 
 
 def get_record_remote_settings(id):
-    record_url = (REMOTE_SETTINGS_RECORD_URL
-                  + '/{record_id}'.format(record_id=id))
+    record_url = make_record_url_remote_settings(id)
     resp = requests.get(record_url, auth=REMOTE_SETTINGS_AUTH)
     if not resp:
         print('{0} looks like it hasn\'t been uploaded to '
@@ -63,8 +62,7 @@ def get_record_remote_settings(id):
 
 
 def put_new_record_remote_settings(config, section, data):
-    record_url = (REMOTE_SETTINGS_RECORD_URL
-                  + '/{record_id}'.format(record_id=data['id']))
+    record_url = make_record_url_remote_settings(data['id'])
     rec_resp = requests.put(
         record_url, json={'data': data}, auth=REMOTE_SETTINGS_AUTH)
 
