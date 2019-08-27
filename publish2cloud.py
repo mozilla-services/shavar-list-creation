@@ -35,6 +35,18 @@ def chunk_metadata(fp):
     )
 
 
+def get_record_remote_settings(id):
+    record_url = (REMOTE_SETTINGS_RECORD_URL + '/{record_id}').format(
+        record_id=id)
+    resp = requests.get(record_url, auth=REMOTE_SETTINGS_AUTH)
+    if not resp:
+        print("{0} looks like it hasn't been uploaded to "
+              "Remote Settings".format(id))
+        return None
+    record = resp.json()['data']
+    return record
+
+
 def check_upload_remote_settings_config(config, section):
     if config.has_option(section, "remote_setting_upload"):
         # if it exists, the specfic section's upload config is prioritized
@@ -48,23 +60,12 @@ def check_upload_remote_settings_config(config, section):
 
 def new_data_to_publish_to_remote_settings(config, section, new):
     # Check to see if update is needed on Remote Settings
-    records_url = REMOTE_SETTING_RECORD_URL
-    resp = requests.get(records_url, auth=('admin', 's3cr3t'))
-    list_name = config.get(section, 'output')
-
-    if resp.status_code != 200:
-        return False, resp.content
-    records = resp.json()['data']
-    record = {}
-    for rec in records:
-        if rec['Name'] == list_name:
-            record = rec
-            break
+    record = get_record_remote_settings(config.get(section, 'output'))
 
     rs_upload_needed = True
-    if record != {} and record.get('CheckSum') == new['checksum']:
+    if record and record.get('CheckSum') == new['checksum']:
         rs_upload_needed = False
-    return rs_upload_needed, record
+    return rs_upload_needed
 
 
 def new_data_to_publish_to_s3(config, section, new):
@@ -210,7 +211,7 @@ def publish_to_cloud(config):
         with open(config.get(section, 'output'), 'rb') as blob:
             new = chunk_metadata(blob)
             s3_upload_needed = new_data_to_publish_to_s3(config, section, new)
-            rs_upload_needed, record = new_data_to_publish_to_remote_settings(config, section, new)
+            rs_upload_needed = new_data_to_publish_to_remote_settings(config, section, new)
             if not s3_upload_needed and not rs_upload_needed:
                 print("No new data to publish for %s" % section)
                 continue
