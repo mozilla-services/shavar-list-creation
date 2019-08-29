@@ -236,10 +236,10 @@ def publish_to_cloud(config, chunknum):
         if section == 'main':
             continue
 
-        upload_to_s3 = False
-        if (config.has_option(section, 's3_upload')
-                and config.getboolean(section, 's3_upload')):
-            upload_to_s3 = True
+        upload_to_s3 = True
+        if (config.has_option(section, "s3_upload")
+                and not config.getboolean(section, "s3_upload")):
+            upload_to_s3 = False
 
         upload_to_remote_setting = check_upload_remote_settings_config(
             config, section)
