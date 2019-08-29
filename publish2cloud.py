@@ -18,18 +18,32 @@ from constants import (
 
 CONFIG = ConfigParser.SafeConfigParser(os.environ)
 CONFIG.read(['shavar_list_creation.ini'])
-REMOTE_SETTINGS_URL = ''
-if os.environ.get('SHAVAR_REMOTE_SETTINGS_URL', None):
-    REMOTE_SETTINGS_URL = CONFIG.get('main', 'remote_settings_url')
-REMOTE_SETTINGS_BUCKET = CONFIG.get('main', 'remote_settings_bucket')
-REMOTE_SETTINGS_COLLECTION = CONFIG.get('main', 'remote_settings_collection')
-REMOTE_SETTINGS_RECORD_PATH = ('/buckets/{bucket_name}'
-                               + '/collections/{collection_name}/records')
-REMOTE_SETTINGS_AUTH = ('', '')
-if (os.environ.get('SHAVAR_REMOTE_SETTINGS_USERNAME', None)
-    and os.environ.get('SHAVAR_REMOTE_SETTINGS_PASSWORD', None)):
-        REMOTE_SETTINGS_AUTH = (CONFIG.get('main', 'remote_settings_username'),
-                                CONFIG.get('main', 'remote_settings_password'))
+try:
+    REMOTE_SETTINGS_URL = ''
+    if os.environ.get('SHAVAR_REMOTE_SETTINGS_URL', None):
+        REMOTE_SETTINGS_URL = CONFIG.get('main', 'remote_settings_url')
+    REMOTE_SETTINGS_BUCKET = CONFIG.get('main', 'remote_settings_bucket')
+    REMOTE_SETTINGS_COLLECTION = CONFIG.get(
+        'main', 'remote_settings_collection'
+    )
+    REMOTE_SETTINGS_RECORD_PATH = ('/buckets/{bucket_name}'
+                                   + '/collections/{collection_name}/records')
+    REMOTE_SETTINGS_AUTH = ('', '')
+    auth_config_exists = (
+        os.environ.get('SHAVAR_REMOTE_SETTINGS_USERNAME', None)
+        and os.environ.get('SHAVAR_REMOTE_SETTINGS_PASSWORD', None)
+    )
+    if auth_config_exists:
+        REMOTE_SETTINGS_AUTH = (
+            CONFIG.get('main', 'remote_settings_username'),
+            CONFIG.get('main', 'remote_settings_password')
+        )
+except ConfigParser.NoOptionError as err:
+    REMOTE_SETTINGS_URL = ''
+    REMOTE_SETTINGS_AUTH = None
+    REMOTE_SETTINGS_BUCKET = ''
+    REMOTE_SETTINGS_COLLECTION = ''
+    REMOTE_SETTINGS_RECORD_PATH = ''
 
 
 def chunk_metadata(fp):
