@@ -6,123 +6,37 @@ import json
 import os
 import re
 import sys
-import tempfile
 import time
 import urllib2
 
-import boto.s3.connection
-import boto.s3.key
 from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
 
 from trackingprotection_tools import DisconnectParser
+
+from constants import (
+    ALL_TAGS,
+    DEFAULT_DISCONNECT_LIST_CATEGORIES,
+    DEFAULT_DISCONNECT_LIST_TAGS,
+    DNT_EFF_SECTIONS,
+    DNT_SECTIONS,
+    DNT_W3C_SECTIONS,
+    FASTBLOCK_SECTIONS,
+    PLUGIN_SECTIONS,
+    PRE_DNT_SECTIONS,
+    TEST_DOMAIN_TEMPLATE,
+    WHITELIST_SECTIONS,
+
+)
+from publish2cloud import (
+    publish_to_cloud
+)
 
 updatePSL()
 psl = PublicSuffixList()
 
 DISCONNECT_MAPPING = os.path.join(
     os.path.dirname(__file__), 'disconnect_mapping.json')
-
-PLUGIN_SECTIONS = (
-    "plugin-blocklist",
-    "plugin-blocklist-experiment",
-    "flash-blocklist",
-    "flash-exceptions",
-    "flash-allow",
-    "flash-allow-exceptions",
-    "flash-subdoc",
-    "flash-subdoc-exceptions",
-    "flashinfobar-exceptions"
-)
-WHITELIST_SECTIONS = (
-    "entity-whitelist",
-    "entity-whitelist-testing",
-    "staging-entity-whitelist",
-    "fastblock1-whitelist",
-    "fastblock2-whitelist"
-)
-PRE_DNT_SECTIONS = (
-    "tracking-protection",
-    "tracking-protection-testing",
-    "tracking-protection-standard",
-    "tracking-protection-full",
-    "staging-tracking-protection-standard",
-    "staging-tracking-protection-full",
-    "fanboy-annoyance",
-    "fanboy-social",
-    "easylist",
-    "easyprivacy",
-    "adguard",
-    "social-tracking-protection",
-    "social-tracking-protection-facebook",
-    "social-tracking-protection-twitter",
-    "social-tracking-protection-linkedin",
-    "social-tracking-protection-youtube",
-)
-PRE_DNT_CONTENT_SECTIONS = (
-    "tracking-protection-full",
-    "staging-tracking-protection-full"
-)
-DNT_SECTIONS = (
-    "tracking-protection-base",
-    "tracking-protection-baseeff",
-    "tracking-protection-basew3c",
-    "tracking-protection-content",
-    "tracking-protection-contenteff",
-    "tracking-protection-contentw3c",
-    "tracking-protection-ads",
-    "tracking-protection-analytics",
-    "tracking-protection-social",
-    "tracking-protection-base-fingerprinting",
-    "tracking-protection-content-fingerprinting",
-    "tracking-protection-base-cryptomining",
-    "tracking-protection-content-cryptomining",
-    "tracking-protection-test-multitag",
-    "fastblock1",
-    "fastblock2",
-    "fastblock3"
-)
-DNT_CONTENT_SECTIONS = (
-    "tracking-protection-content",
-    "tracking-protection-contenteff",
-    "tracking-protection-contentw3c"
-)
-DNT_BLANK_SECTIONS = (
-    "tracking-protection-base",
-    "tracking-protection-content",
-)
-DNT_EFF_SECTIONS = (
-    "tracking-protection-baseeff",
-    "tracking-protection-contenteff",
-)
-DNT_W3C_SECTIONS = (
-    "tracking-protection-basew3c",
-    "tracking-protection-contentw3c"
-)
-FASTBLOCK_SECTIONS = (
-    "fastblock1",
-    "fastblock1-whitelist",
-    "fastblock2",
-    "fastblock2-whitelist",
-    "fastblock3"
-)
-
-FINGERPRINTING_TAG = 'fingerprinting'
-CRYPTOMINING_TAG = 'cryptominer'
-SESSION_REPLAY_TAG = 'session-replay'
-PERFORMANCE_TAG = 'performance'
-ALL_TAGS = {
-    FINGERPRINTING_TAG,
-    CRYPTOMINING_TAG,
-    SESSION_REPLAY_TAG,
-    PERFORMANCE_TAG
-}
-
-TEST_DOMAIN_TEMPLATE = '%s.dummytracker.org'
-
-DEFAULT_DISCONNECT_LIST_CATEGORIES = [
-    'Advertising|Analytics|Social|Disconnect']
-DEFAULT_DISCONNECT_LIST_TAGS = {}
 
 
 def get_output_and_log_files(config, section):
@@ -459,54 +373,6 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
         list_variant, publishing, output_size))
 
 
-def chunk_metadata(fp):
-    # Read the first 25 bytes and look for a new line.  Since this is a file
-    # formatted like a chunk, a end of the chunk header(a newline) should be
-    # found early.
-    header = fp.read(25)
-    eoh = header.find('\n')
-    chunktype, chunknum, hash_size, data_len = header[:eoh].split(':')
-    return dict(
-        type=chunktype, num=chunknum, hash_size=hash_size, len=data_len,
-        checksum=hashlib.sha256(fp.read()).hexdigest()
-    )
-
-
-def new_data_to_publish(config, section, blob):
-    # Get the metadata for our old chunk
-
-    # If necessary fetch the existing data from S3, otherwise open a local file
-    if ((config.has_option('main', 's3_upload')
-         and config.getboolean('main', 's3_upload'))
-        or (config.has_option(section, 's3_upload')
-            and config.getboolean(section, 's3_upload'))):
-        conn = boto.s3.connection.S3Connection()
-        bucket = conn.get_bucket(config.get('main', 's3_bucket'))
-        s3key = config.get(section, 's3_key') or config.get(section, 'output')
-        key = bucket.get_key(s3key)
-        if key is None:
-            # most likely a new list
-            print("{0} looks like it hasn't been uploaded to "
-                  "s3://{1}/{2}".format(section, bucket.name, s3key))
-            key = boto.s3.key.Key(bucket)
-            key.key = s3key
-            key.set_contents_from_string("a:1:32:32\n" + 32 * '1')
-        current = tempfile.TemporaryFile()
-        key.get_contents_to_file(current)
-        current.seek(0)
-    else:
-        current = open(config.get(section, 'output'), 'rb')
-
-    old = chunk_metadata(current)
-    current.close()
-
-    new = chunk_metadata(blob)
-
-    if old['checksum'] != new['checksum']:
-        return True
-    return False
-
-
 def main():
     config = ConfigParser.ConfigParser()
     filename = config.read(["shavar_list_creation.ini"])
@@ -632,48 +498,7 @@ def main():
     if log_file:
         log_file.close()
 
-    # Optionally upload to S3. If s3_upload is set, then s3_bucket and s3_key
-    # must be set.
-    for section in config.sections():
-        if section == 'main':
-            continue
-
-        with open(config.get(section, 'output'), 'rb') as blob:
-            if not new_data_to_publish(config, section, blob):
-                print("No new data to publish for %s" % section)
-                continue
-
-        if (config.has_option(section, "s3_upload")
-                and not config.getboolean(section, "s3_upload")):
-            print("Skipping S3 upload for %s" % section)
-            continue
-
-        bucket = config.get("main", "s3_bucket")
-        # Override with list specific bucket if necessary
-        if config.has_option(section, "s3_bucket"):
-            bucket = config.get(section, "s3_bucket")
-
-        key = os.path.basename(config.get(section, "output"))
-        # Override with list specific value if necessary
-        if config.has_option(section, "s3_key"):
-            key = config.get(section, "s3_key")
-
-        chunk_key = os.path.join(
-            config.get(section, os.path.basename('output')), str(chunknum))
-
-        if not bucket or not key:
-            sys.stderr.write(
-                "Can't upload to s3 without s3_bucket and s3_key\n")
-            sys.exit(-1)
-
-        output_filename = config.get(section, "output")
-        conn = boto.s3.connection.S3Connection()
-        bucket = conn.get_bucket(bucket)
-        for key_name in (chunk_key, key):
-            k = boto.s3.key.Key(bucket)
-            k.key = key_name
-            k.set_contents_from_filename(output_filename)
-        print("Uploaded to s3: %s" % section)
+    publish_to_cloud(config, chunknum)
 
 
 if __name__ == "__main__":
