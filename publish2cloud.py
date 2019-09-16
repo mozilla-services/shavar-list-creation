@@ -11,6 +11,9 @@ import boto.s3.key
 from constants import (
     DEFAULT_DISCONNECT_LIST_CATEGORIES,
     DNT_SECTIONS,
+    LIST_TYPE_ENTITY,
+    LIST_TYPE_TRACKER,
+    LIST_TYPE_PLUGIN,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
     WHITELIST_SECTIONS,
@@ -195,7 +198,7 @@ def publish_to_remote_settings(config, section):
     categories = []
     excluded_categories = []
     if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
-        list_type = 'Tracker'
+        list_type = LIST_TYPE_TRACKER
         if config.has_option(section, 'categories'):
             list_categories = config.get(section, 'categories').split(',')
         else:
@@ -211,9 +214,9 @@ def publish_to_remote_settings(config, section):
             for x in excluded:
                 excluded_categories.extend(x.split('|'))
     elif (section in PLUGIN_SECTIONS):
-        list_type = 'Plugin'
+        list_type = LIST_TYPE_PLUGIN
     elif (section in WHITELIST_SECTIONS):
-        list_type = 'Entity'
+        list_type = LIST_TYPE_ENTITY
 
     list_name = config.get(section, 'output')
     chunk_file = chunk_metadata(open(config.get(section, 'output'), 'rb'))
