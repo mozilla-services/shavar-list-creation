@@ -398,8 +398,6 @@ def main():
                 disconnect_mapping=DISCONNECT_MAPPING
             )
 
-            output_file, log_file = get_output_and_log_files(config, section)
-
             # load our allowlist
             allowed = set()
             try:
@@ -459,6 +457,7 @@ def main():
                 parser, list_categories, excluded_categories,
                 which_dnt, desired_tags)
 
+            output_file, log_file = get_output_and_log_files(config, section)
             # Write blocklist in a format compatible with safe browsing
             output_filename = config.get(section, "output")
             write_safebrowsing_blocklist(
@@ -467,8 +466,6 @@ def main():
             )
 
         if section in PLUGIN_SECTIONS:
-            output_file, log_file = get_output_and_log_files(config, section)
-
             # load the plugin blocklist
             blocked = set()
             blocklist_url = config.get(section, "blocklist")
@@ -480,6 +477,7 @@ def main():
                         continue
                     blocked.add(line)
 
+            output_file, log_file = get_output_and_log_files(config, section)
             process_plugin_blocklist(blocked, chunknum, output_file, log_file,
                                      section)
 
