@@ -373,6 +373,87 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
         list_variant, publishing, output_size))
 
 
+def get_tracker_lists(config, section, chunknum):
+    if (section in FASTBLOCK_SECTIONS):
+        # process fastblock
+        blocklist_url = get_list_url(config, section, "blocklist_url")
+    else:
+        # process disconnect
+        blocklist_url = get_list_url(config, section, "disconnect_url")
+    parser = DisconnectParser(
+        blocklist_url=blocklist_url,
+        disconnect_mapping=DISCONNECT_MAPPING
+    )
+
+    # load our allowlist
+    allowed = set()
+    try:
+        allowlist_url = config.get(section, "allowlist_url")
+    except Exception:
+        allowlist_url = None
+    # TODO: refactor into: def get_allowed_domains(allowlist_url)
+    if allowlist_url:
+        for line in urllib2.urlopen(allowlist_url).readlines():
+            line = line.strip()
+            # don't add blank lines or comments
+            if not line or line.startswith('#'):
+                continue
+            allowed.add(line)
+
+    # category filter
+    if config.has_option(section, "categories"):
+        list_categories = config.get(section, "categories").split(',')
+    else:
+        list_categories = DEFAULT_DISCONNECT_LIST_CATEGORIES
+    list_categories = [x.split('|') for x in list_categories]
+
+    # excluded categories filter
+    if config.has_option(section, "excluded_categories"):
+        excluded_categories = config.get(
+            section, "excluded_categories").split(',')
+        excluded_categories = [
+            x.split('|') for x in excluded_categories]
+    else:
+        excluded_categories = list()
+
+    # dnt filter
+    if section in DNT_EFF_SECTIONS:
+        which_dnt = "eff"
+    elif section in DNT_W3C_SECTIONS:
+        which_dnt = "w3c"
+    else:
+        which_dnt = ""
+
+    # tag filter
+    try:
+        desired_tags = set(config.get(
+            section, "disconnect_tags").split(','))
+        if len(desired_tags.difference(ALL_TAGS)) > 0:
+            raise ValueError(
+                "The configuration file contains unsupported tags.\n"
+                "Supported tags: %s\nConfig file tags: %s" %
+                (ALL_TAGS, desired_tags)
+            )
+    except ConfigParser.NoOptionError:
+        desired_tags = DEFAULT_DISCONNECT_LIST_TAGS
+
+    # Retrieve domains that match filters
+    print("\n------ %s ------" % section)
+    print("-->blocklist: %s)" % blocklist_url)
+    blocked_domains = get_domains_from_filters(
+        parser, list_categories, excluded_categories,
+        which_dnt, desired_tags)
+
+    output_file, log_file = get_output_and_log_files(config, section)
+    # Write blocklist in a format compatible with safe browsing
+    output_filename = config.get(section, "output")
+    write_safebrowsing_blocklist(
+        blocked_domains, output_filename, allowed, log_file,
+        chunknum, output_file, section
+    )
+    return output_file, log_file
+
+
 def main():
     config = ConfigParser.ConfigParser()
     filename = config.read(["shavar_list_creation.ini"])
@@ -387,83 +468,8 @@ def main():
             continue
 
         if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
-            if (section in FASTBLOCK_SECTIONS):
-                # process fastblock
-                blocklist_url = get_list_url(config, section, "blocklist_url")
-            else:
-                # process disconnect
-                blocklist_url = get_list_url(config, section, "disconnect_url")
-            parser = DisconnectParser(
-                blocklist_url=blocklist_url,
-                disconnect_mapping=DISCONNECT_MAPPING
-            )
-
-            # load our allowlist
-            allowed = set()
-            try:
-                allowlist_url = config.get(section, "allowlist_url")
-            except Exception:
-                allowlist_url = None
-            # TODO: refactor into: def get_allowed_domains(allowlist_url)
-            if allowlist_url:
-                for line in urllib2.urlopen(allowlist_url).readlines():
-                    line = line.strip()
-                    # don't add blank lines or comments
-                    if not line or line.startswith('#'):
-                        continue
-                    allowed.add(line)
-
-            # category filter
-            if config.has_option(section, "categories"):
-                list_categories = config.get(section, "categories").split(',')
-            else:
-                list_categories = DEFAULT_DISCONNECT_LIST_CATEGORIES
-            list_categories = [x.split('|') for x in list_categories]
-
-            # excluded categories filter
-            if config.has_option(section, "excluded_categories"):
-                excluded_categories = config.get(
-                    section, "excluded_categories").split(',')
-                excluded_categories = [
-                    x.split('|') for x in excluded_categories]
-            else:
-                excluded_categories = list()
-
-            # dnt filter
-            if section in DNT_EFF_SECTIONS:
-                which_dnt = "eff"
-            elif section in DNT_W3C_SECTIONS:
-                which_dnt = "w3c"
-            else:
-                which_dnt = ""
-
-            # tag filter
-            try:
-                desired_tags = set(config.get(
-                    section, "disconnect_tags").split(','))
-                if len(desired_tags.difference(ALL_TAGS)) > 0:
-                    raise ValueError(
-                        "The configuration file contains unsupported tags.\n"
-                        "Supported tags: %s\nConfig file tags: %s" %
-                        (ALL_TAGS, desired_tags)
-                    )
-            except ConfigParser.NoOptionError:
-                desired_tags = DEFAULT_DISCONNECT_LIST_TAGS
-
-            # Retrieve domains that match filters
-            print("\n------ %s ------" % section)
-            print("-->blocklist: %s)" % blocklist_url)
-            blocked_domains = get_domains_from_filters(
-                parser, list_categories, excluded_categories,
-                which_dnt, desired_tags)
-
-            output_file, log_file = get_output_and_log_files(config, section)
-            # Write blocklist in a format compatible with safe browsing
-            output_filename = config.get(section, "output")
-            write_safebrowsing_blocklist(
-                blocked_domains, output_filename, allowed, log_file,
-                chunknum, output_file, section
-            )
+            output_file, log_file = get_tracker_lists(
+                config, section, chunknum)
 
         if section in PLUGIN_SECTIONS:
             # load the plugin blocklist
