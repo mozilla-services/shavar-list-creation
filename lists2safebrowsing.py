@@ -544,6 +544,32 @@ def main():
 
     publish_to_cloud(config, chunknum)
 
+    shavar_prod_lists_branch = {
+      'name': '70',
+      'commit': {
+        'sha': '8ffa3c6d702002e9a357dd0042848c9418e0ef8a',
+        'url': 'https://api.github.com/repos/mozilla-services/shavar-prod-lists/commits/8ffa3c6d702002e9a357dd0042848c9418e0ef8a'
+      },
+      'protected': False
+    }
+    shavar_prod_lists_non_versioning_branch = {
+      'name': 'non-versioning-branch',
+      'commit': {
+        'sha': '8ffa3c6d702002e9a357dd0042848c9418e0ef8a',
+        'url': 'https://api.github.com/repos/mozilla-services/shavar-prod-lists/commits/8ffa3c6d702002e9a357dd0042848c9418e0ef8a'
+      },
+      'protected': False
+    }
+    # get shavar_prod_lists branches from git
+    shavar_prod_lists_branches = [shavar_prod_lists_branch, shavar_prod_lists_non_versioning_branch]
+    for branch in shavar_prod_lists_branches:
+        branch_name = branch.get('name')
+        try:
+            int(branch_name)
+            get_versioned_lists(config, chunknum, version=branch_name)
+        except ValueError as exc:
+            print(branch_name + ' is not a versioning branch')
+
 
 if __name__ == "__main__":
     main()
