@@ -454,6 +454,46 @@ def get_tracker_lists(config, section, chunknum):
     return output_file, log_file
 
 
+def get_versioned_lists(config, chunknum, version):
+    '''
+    Checks `versioning_needed` in each sections then versions the tracker lists
+    by overwriting the existing SafeBrowsing formatted files.
+    '''
+    default_url = config.get('main', 'default_disconnect_url')
+    versioned_default_url = default_url.replace('master', version)
+    print('New default disconnect url is ' + versioned_default_url)
+    config.set('main', 'default_disconnect_url', versioned_default_url)
+    for section in config.sections():
+        versioning_needed = (
+            config.has_option(section, 'versioning_needed')
+                and config.get(section, 'versioning_needed')
+        )
+        if not versioning_needed:
+            continue
+        print('Versioning for ' + config.get(section, 'output'))
+        default = config.get('main', 'default_disconnect_url')
+        print('Default disconnect URL: ' + default)
+        if config.has_option(section, 'disconnect_url'):
+            disconnect_url = config.get(section, 'disconnect_url')
+            versioned_disconnect_url = disconnect_url.replace('master', version)
+            config.set(section, 'disconnect_url', versioned_disconnect_url)
+            new_url = config.get(section, 'disconnect_url')
+            print('Versioned disconnect url is ' + new_url)
+        if config.has_option(section, 's3_key'):
+            s3_key = config.get(section, 's3_key')
+            versioned_s3_key = s3_key.replace('tracking/', 'tracking/{ver}/'.format(ver=version))
+            config.set(section, 's3_key', versioned_s3_key)
+            new_s3_key = config.get(section, 's3_key')
+            print('Versioned s3 key is ' + new_s3_key)
+        output_file, log_file = get_tracker_lists(
+            config, section, chunknum)
+
+    if output_file:
+        output_file.close()
+    if log_file:
+        log_file.close()
+
+
 def main():
     config = ConfigParser.ConfigParser()
     filename = config.read(["shavar_list_creation.ini"])
