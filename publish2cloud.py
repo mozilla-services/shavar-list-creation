@@ -232,12 +232,21 @@ def publish_to_remote_settings(config, section):
     print('Uploaded to remote settings: %s' % list_name)
 
 
-def publish_to_cloud(config, chunknum):
+def publish_to_cloud(config, chunknum, check_versioning=None):
     # Optionally upload to S3. If s3_upload is set, then s3_bucket and s3_key
     # must be set.
     for section in config.sections():
         if section == 'main':
             continue
+
+        if check_versioning:
+            versioning_needed = (
+                config.has_option(section, 'versioning_needed')
+                    and config.get(section, 'versioning_needed')
+            )
+            if not versioning_needed:
+                continue
+            print('Publishing versioning lists for: ' + section)
 
         upload_to_s3 = True
         if (config.has_option(section, "s3_upload")
