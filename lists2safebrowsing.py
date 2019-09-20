@@ -508,10 +508,10 @@ def revert_config(config, version):
 
 
 def get_versioned_lists(config, chunknum, version):
-    '''
+    """
     Checks `versioning_needed` in each sections then versions the tracker lists
     by overwriting the existing SafeBrowsing formatted files.
-    '''
+    """
     edit_config(
         config, section='main', option='default_disconnect_url',
         old_value='master', new_value=version)
