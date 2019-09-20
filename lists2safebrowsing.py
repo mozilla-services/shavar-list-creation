@@ -10,6 +10,7 @@ import sys
 import time
 import urllib2
 
+from packaging import version
 from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
 
@@ -589,14 +590,14 @@ def main():
         shavar_prod_lists_branches = resp.json()
         for branch in shavar_prod_lists_branches:
             branch_name = branch.get('name')
-            try:
-                float(branch_name)
+            ver = version.parse(branch_name)
+            if isinstance(ver, version.Version):
                 get_versioned_lists(config, chunknum, version=branch_name)
                 print('*** Publish Versioned Lists ***')
                 publish_to_cloud(config, chunknum, check_versioning=True)
                 print('*** Revert Configs ***')
                 revert_config(config, branch_name)
-            except (ValueError, TypeError) as exc:
+            else:
                 print(branch_name + ' is not a versioning branch')
     else:
         print('Unable to get branches from shavar-prod-lists repo')
