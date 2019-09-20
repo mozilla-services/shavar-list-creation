@@ -520,9 +520,9 @@ def get_versioned_lists(config, chunknum, version):
         )
         if not versioning_needed:
             continue
-        print('Versioning for ' + config.get(section, 'output'))
-        default = config.get('main', 'default_disconnect_url')
-        print('Default disconnect URL: ' + default)
+        print('Version {ver} for {output}'.format(
+            ver=version, output=config.get(section, 'output'))
+        )
         version_configurations(config, section, version)
         output_file, log_file = get_tracker_lists(
             config, section, chunknum)
@@ -592,7 +592,9 @@ def main():
             try:
                 float(branch_name)
                 get_versioned_lists(config, chunknum, version=branch_name)
-                publish_to_cloud(config, chunknum)
+                print('*** Publish Versioned Lists ***')
+                publish_to_cloud(config, chunknum, check_versioning=True)
+                print('*** Revert Configs ***')
                 revert_config(config, branch_name)
             except (ValueError, TypeError) as exc:
                 print(branch_name + ' is not a versioning branch')
