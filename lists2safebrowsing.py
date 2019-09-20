@@ -510,10 +510,9 @@ def get_versioned_lists(config, chunknum, version):
     Checks `versioning_needed` in each sections then versions the tracker lists
     by overwriting the existing SafeBrowsing formatted files.
     '''
-    default_url = config.get('main', 'default_disconnect_url')
-    versioned_default_url = default_url.replace('master', version)
-    print('New default disconnect url is ' + versioned_default_url)
-    config.set('main', 'default_disconnect_url', versioned_default_url)
+    edit_config(
+        config, section='main', option='default_disconnect_url',
+        old_value='master', new_value=version)
     for section in config.sections():
         versioning_needed = (
             config.has_option(section, 'versioning_needed')
