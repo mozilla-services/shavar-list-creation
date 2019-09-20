@@ -242,7 +242,7 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
         if check_versioning:
             versioning_needed = (
                 config.has_option(section, 'versioning_needed')
-                    and config.get(section, 'versioning_needed')
+                and config.get(section, 'versioning_needed')
             )
             if not versioning_needed:
                 continue

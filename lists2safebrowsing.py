@@ -500,7 +500,7 @@ def revert_config(config, version):
     for section in config.sections():
         versioning_needed = (
             config.has_option(section, 'versioning_needed')
-                and config.get(section, 'versioning_needed')
+            and config.get(section, 'versioning_needed')
         )
         if not versioning_needed:
             continue
@@ -518,7 +518,7 @@ def get_versioned_lists(config, chunknum, version):
     for section in config.sections():
         versioning_needed = (
             config.has_option(section, 'versioning_needed')
-                and config.get(section, 'versioning_needed')
+            and config.get(section, 'versioning_needed')
         )
         if not versioning_needed:
             continue
