@@ -38,7 +38,8 @@ psl = PublicSuffixList()
 
 DISCONNECT_MAPPING = os.path.join(
     os.path.dirname(__file__), 'disconnect_mapping.json')
-GITHUB_API_URL = 'https://api.github.com/repos/mozilla-services/'
+GITHUB_API_URL = 'https://api.github.com/repos/mozilla-services'
+SHAVAR_PROD_LISTS_BRANCHES_PATH = '/shavar-prod-lists/branches'
 
 
 def get_output_and_log_files(config, section):
@@ -584,8 +585,8 @@ def main():
 
     publish_to_cloud(config, chunknum)
 
-    resp = requests.get(GITHUB_API_URL + 'shavar-prod-lists/branches')
-
+    # create and publish versioned lists
+    resp = requests.get(GITHUB_API_URL + SHAVAR_PROD_LISTS_BRANCHES_PATH)
     if resp:
         shavar_prod_lists_branches = resp.json()
         for branch in shavar_prod_lists_branches:
