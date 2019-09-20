@@ -455,6 +455,42 @@ def get_tracker_lists(config, section, chunknum):
     return output_file, log_file
 
 
+def edit_config(config, section, option, old_value, new_value):
+    current = config.get(section, option)
+    edited_config = current.replace(old_value, new_value)
+    config.set(section, option, edited_config)
+    print('Edited {opt} in {sect} to: {new}'.format(
+        opt=option, sect=section, new=config.get(section, option))
+    )
+
+
+def version_configurations(config, section, version, revert=None):
+    initial_disconnect_url_val = 'master'
+    initial_s3_key_value = 'tracking/'
+    if revert:
+        if config.has_option(section, 'disconnect_url'):
+            edit_config(
+                config, section, option='disconnect_url',
+                old_value=version, new_value=initial_disconnect_url_val)
+        if config.has_option(section, 's3_key'):
+            versioned_key = 'tracking/{ver}/'.format(ver=version)
+            edit_config(
+                config, section, option='s3_key',
+                old_value=versioned_key, new_value=initial_s3_key_value)
+        return
+
+    if config.has_option(section, 'disconnect_url'):
+        edit_config(
+            config, section, option='disconnect_url',
+            old_value=initial_disconnect_url_val, new_value=version)
+
+    if config.has_option(section, 's3_key'):
+        versioned_key = 'tracking/{ver}/'.format(ver=version)
+        edit_config(
+            config, section, option='s3_key',
+            old_value=initial_s3_key_value, new_value=versioned_key)
+
+
 def get_versioned_lists(config, chunknum, version):
     '''
     Checks `versioning_needed` in each sections then versions the tracker lists
@@ -474,18 +510,7 @@ def get_versioned_lists(config, chunknum, version):
         print('Versioning for ' + config.get(section, 'output'))
         default = config.get('main', 'default_disconnect_url')
         print('Default disconnect URL: ' + default)
-        if config.has_option(section, 'disconnect_url'):
-            disconnect_url = config.get(section, 'disconnect_url')
-            versioned_disconnect_url = disconnect_url.replace('master', version)
-            config.set(section, 'disconnect_url', versioned_disconnect_url)
-            new_url = config.get(section, 'disconnect_url')
-            print('Versioned disconnect url is ' + new_url)
-        if config.has_option(section, 's3_key'):
-            s3_key = config.get(section, 's3_key')
-            versioned_s3_key = s3_key.replace('tracking/', 'tracking/{ver}/'.format(ver=version))
-            config.set(section, 's3_key', versioned_s3_key)
-            new_s3_key = config.get(section, 's3_key')
-            print('Versioned s3 key is ' + new_s3_key)
+        version_configurations(config, section, version)
         output_file, log_file = get_tracker_lists(
             config, section, chunknum)
 
