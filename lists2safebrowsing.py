@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import requests
 import sys
 import time
 import urllib2
@@ -26,7 +27,6 @@ from constants import (
     PRE_DNT_SECTIONS,
     TEST_DOMAIN_TEMPLATE,
     WHITELIST_SECTIONS,
-
 )
 from publish2cloud import (
     publish_to_cloud
@@ -37,6 +37,7 @@ psl = PublicSuffixList()
 
 DISCONNECT_MAPPING = os.path.join(
     os.path.dirname(__file__), 'disconnect_mapping.json')
+GITHUB_API_URL = 'https://api.github.com/repos/mozilla-services/'
 
 
 def get_output_and_log_files(config, section):
@@ -544,31 +545,21 @@ def main():
 
     publish_to_cloud(config, chunknum)
 
-    shavar_prod_lists_branch = {
-      'name': '70',
-      'commit': {
-        'sha': '8ffa3c6d702002e9a357dd0042848c9418e0ef8a',
-        'url': 'https://api.github.com/repos/mozilla-services/shavar-prod-lists/commits/8ffa3c6d702002e9a357dd0042848c9418e0ef8a'
-      },
-      'protected': False
-    }
-    shavar_prod_lists_non_versioning_branch = {
-      'name': 'non-versioning-branch',
-      'commit': {
-        'sha': '8ffa3c6d702002e9a357dd0042848c9418e0ef8a',
-        'url': 'https://api.github.com/repos/mozilla-services/shavar-prod-lists/commits/8ffa3c6d702002e9a357dd0042848c9418e0ef8a'
-      },
-      'protected': False
-    }
-    # get shavar_prod_lists branches from git
-    shavar_prod_lists_branches = [shavar_prod_lists_branch, shavar_prod_lists_non_versioning_branch]
-    for branch in shavar_prod_lists_branches:
-        branch_name = branch.get('name')
-        try:
-            int(branch_name)
-            get_versioned_lists(config, chunknum, version=branch_name)
-        except ValueError as exc:
-            print(branch_name + ' is not a versioning branch')
+    resp = requests.get(GITHUB_API_URL + 'shavar-prod-lists/branches')
+
+    if resp:
+        shavar_prod_lists_branches = resp.json()
+        for branch in shavar_prod_lists_branches:
+            branch_name = branch.get('name')
+            try:
+                float(branch_name)
+                get_versioned_lists(config, chunknum, version=branch_name)
+                publish_to_cloud(config, chunknum)
+                revert_config(config, branch_name)
+            except (ValueError, TypeError) as exc:
+                print(branch_name + ' is not a versioning branch')
+    else:
+        print('Unable to get branches from shavar-prod-lists repo')
 
 
 if __name__ == "__main__":
