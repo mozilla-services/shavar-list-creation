@@ -491,6 +491,20 @@ def version_configurations(config, section, version, revert=None):
             old_value=initial_s3_key_value, new_value=versioned_key)
 
 
+def revert_config(config, version):
+    edit_config(
+        config=config, section='main', option='default_disconnect_url',
+        old_value=version, new_value='master')
+    for section in config.sections():
+        versioning_needed = (
+            config.has_option(section, 'versioning_needed')
+                and config.get(section, 'versioning_needed')
+        )
+        if not versioning_needed:
+            continue
+        version_configurations(config, section, version, revert=True)
+
+
 def get_versioned_lists(config, chunknum, version):
     '''
     Checks `versioning_needed` in each sections then versions the tracker lists
