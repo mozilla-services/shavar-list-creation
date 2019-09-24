@@ -542,6 +542,25 @@ def get_versioned_lists(config, chunknum, version):
         log_file.close()
 
 
+def start_versioning(config, chunknum, shavar_prod_lists_branches):
+    for branch in shavar_prod_lists_branches:
+        branch_name = branch.get('name')
+        ver = version.parse(branch_name)
+        if isinstance(ver, version.Version):
+            print('\n\n*** Start Versioining for {ver} ***'.format(
+                ver=branch_name)
+            )
+            get_versioned_lists(config, chunknum, version=branch_name)
+            print('\n*** Publish Versioned Lists ***')
+            publish_to_cloud(config, chunknum, check_versioning=True)
+            print('\n*** Revert Configs ***')
+            revert_config(config, branch_name)
+        else:
+            print('\n\n*** {branch} is not a versioning branch ***'.format(
+                branch=branch_name)
+            )
+
+
 def main():
     config = ConfigParser.ConfigParser()
     filename = config.read(["shavar_list_creation.ini"])
@@ -596,22 +615,7 @@ def main():
     resp = requests.get(GITHUB_API_URL + SHAVAR_PROD_LISTS_BRANCHES_PATH)
     if resp:
         shavar_prod_lists_branches = resp.json()
-        for branch in shavar_prod_lists_branches:
-            branch_name = branch.get('name')
-            ver = version.parse(branch_name)
-            if isinstance(ver, version.Version):
-                print('\n\n*** Start Versioining for {ver} ***'.format(
-                    ver=branch_name)
-                )
-                get_versioned_lists(config, chunknum, version=branch_name)
-                print('\n*** Publish Versioned Lists ***')
-                publish_to_cloud(config, chunknum, check_versioning=True)
-                print('\n*** Revert Configs ***')
-                revert_config(config, branch_name)
-            else:
-                print('\n\n*** {branch} is not a versioning branch ***'.format(
-                    branch=branch_name)
-                )
+        start_versioning(config, chunknum, shavar_prod_lists_branches)
     else:
         print('\n\n*** Unable to get branches from shavar-prod-lists repo ***')
 
