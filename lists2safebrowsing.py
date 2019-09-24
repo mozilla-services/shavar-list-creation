@@ -5,10 +5,12 @@ import hashlib
 import json
 import os
 import re
+import requests
 import sys
 import time
 import urllib2
 
+from packaging import version
 from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
 
@@ -26,7 +28,6 @@ from constants import (
     PRE_DNT_SECTIONS,
     TEST_DOMAIN_TEMPLATE,
     WHITELIST_SECTIONS,
-
 )
 from publish2cloud import (
     publish_to_cloud
@@ -37,6 +38,10 @@ psl = PublicSuffixList()
 
 DISCONNECT_MAPPING = os.path.join(
     os.path.dirname(__file__), 'disconnect_mapping.json')
+GITHUB_API_URL = 'https://api.github.com'
+SHAVAR_PROD_LISTS_BRANCHES_PATH = (
+    '/repos/mozilla-services/shavar-prod-lists/branches'
+)
 
 
 def get_output_and_log_files(config, section):
@@ -373,6 +378,168 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
         list_variant, publishing, output_size))
 
 
+def get_tracker_lists(config, section, chunknum):
+    if (section in FASTBLOCK_SECTIONS):
+        # process fastblock
+        blocklist_url = get_list_url(config, section, "blocklist_url")
+    else:
+        # process disconnect
+        blocklist_url = get_list_url(config, section, "disconnect_url")
+    parser = DisconnectParser(
+        blocklist_url=blocklist_url,
+        disconnect_mapping=DISCONNECT_MAPPING
+    )
+
+    # load our allowlist
+    allowed = set()
+    try:
+        allowlist_url = config.get(section, "allowlist_url")
+    except Exception:
+        allowlist_url = None
+    # TODO: refactor into: def get_allowed_domains(allowlist_url)
+    if allowlist_url:
+        for line in urllib2.urlopen(allowlist_url).readlines():
+            line = line.strip()
+            # don't add blank lines or comments
+            if not line or line.startswith('#'):
+                continue
+            allowed.add(line)
+
+    # category filter
+    if config.has_option(section, "categories"):
+        list_categories = config.get(section, "categories").split(',')
+    else:
+        list_categories = DEFAULT_DISCONNECT_LIST_CATEGORIES
+    list_categories = [x.split('|') for x in list_categories]
+
+    # excluded categories filter
+    if config.has_option(section, "excluded_categories"):
+        excluded_categories = config.get(
+            section, "excluded_categories").split(',')
+        excluded_categories = [
+            x.split('|') for x in excluded_categories]
+    else:
+        excluded_categories = list()
+
+    # dnt filter
+    if section in DNT_EFF_SECTIONS:
+        which_dnt = "eff"
+    elif section in DNT_W3C_SECTIONS:
+        which_dnt = "w3c"
+    else:
+        which_dnt = ""
+
+    # tag filter
+    try:
+        desired_tags = set(config.get(
+            section, "disconnect_tags").split(','))
+        if len(desired_tags.difference(ALL_TAGS)) > 0:
+            raise ValueError(
+                "The configuration file contains unsupported tags.\n"
+                "Supported tags: %s\nConfig file tags: %s" %
+                (ALL_TAGS, desired_tags)
+            )
+    except ConfigParser.NoOptionError:
+        desired_tags = DEFAULT_DISCONNECT_LIST_TAGS
+
+    # Retrieve domains that match filters
+    print("\n------ %s ------" % section)
+    print("-->blocklist: %s)" % blocklist_url)
+    blocked_domains = get_domains_from_filters(
+        parser, list_categories, excluded_categories,
+        which_dnt, desired_tags)
+
+    output_file, log_file = get_output_and_log_files(config, section)
+    # Write blocklist in a format compatible with safe browsing
+    output_filename = config.get(section, "output")
+    write_safebrowsing_blocklist(
+        blocked_domains, output_filename, allowed, log_file,
+        chunknum, output_file, section
+    )
+    return output_file, log_file
+
+
+def edit_config(config, section, option, old_value, new_value):
+    current = config.get(section, option)
+    edited_config = current.replace(old_value, new_value)
+    config.set(section, option, edited_config)
+    print('Edited {opt} in {sect} to: {new}'.format(
+        opt=option, sect=section, new=config.get(section, option))
+    )
+
+
+def version_configurations(config, section, version):
+    initial_disconnect_url_val = 'master'
+    initial_s3_key_value = 'tracking/'
+
+    if config.has_option(section, 'disconnect_url'):
+        edit_config(
+            config, section, option='disconnect_url',
+            old_value=initial_disconnect_url_val, new_value=version)
+
+    if config.has_option(section, 's3_key'):
+        versioned_key = 'tracking/{ver}/'.format(ver=version)
+        edit_config(
+            config, section, option='s3_key',
+            old_value=initial_s3_key_value, new_value=versioned_key)
+
+
+def revert_version_configurations(config, section, version):
+    initial_disconnect_url_val = 'master'
+    initial_s3_key_value = 'tracking/'
+    if config.has_option(section, 'disconnect_url'):
+        edit_config(
+            config, section, option='disconnect_url',
+            old_value=version, new_value=initial_disconnect_url_val)
+    if config.has_option(section, 's3_key'):
+        versioned_key = 'tracking/{ver}/'.format(ver=version)
+        edit_config(
+            config, section, option='s3_key',
+            old_value=versioned_key, new_value=initial_s3_key_value)
+
+
+def revert_config(config, version):
+    edit_config(
+        config=config, section='main', option='default_disconnect_url',
+        old_value=version, new_value='master')
+    for section in config.sections():
+        versioning_needed = (
+            config.has_option(section, 'versioning_needed')
+            and config.get(section, 'versioning_needed')
+        )
+        if not versioning_needed:
+            continue
+        revert_version_configurations(config, section, version)
+
+
+def get_versioned_lists(config, chunknum, version):
+    """
+    Checks `versioning_needed` in each sections then versions the tracker lists
+    by overwriting the existing SafeBrowsing formatted files.
+    """
+    edit_config(
+        config, section='main', option='default_disconnect_url',
+        old_value='master', new_value=version)
+    for section in config.sections():
+        versioning_needed = (
+            config.has_option(section, 'versioning_needed')
+            and config.get(section, 'versioning_needed')
+        )
+        if not versioning_needed:
+            continue
+        print('\n*** Version {ver} for {output} ***'.format(
+            ver=version, output=config.get(section, 'output'))
+        )
+        version_configurations(config, section, version)
+        output_file, log_file = get_tracker_lists(
+            config, section, chunknum)
+
+    if output_file:
+        output_file.close()
+    if log_file:
+        log_file.close()
+
+
 def main():
     config = ConfigParser.ConfigParser()
     filename = config.read(["shavar_list_creation.ini"])
@@ -387,88 +554,10 @@ def main():
             continue
 
         if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
-            if (section in FASTBLOCK_SECTIONS):
-                # process fastblock
-                blocklist_url = get_list_url(config, section, "blocklist_url")
-            else:
-                # process disconnect
-                blocklist_url = get_list_url(config, section, "disconnect_url")
-            parser = DisconnectParser(
-                blocklist_url=blocklist_url,
-                disconnect_mapping=DISCONNECT_MAPPING
-            )
-
-            output_file, log_file = get_output_and_log_files(config, section)
-
-            # load our allowlist
-            allowed = set()
-            try:
-                allowlist_url = config.get(section, "allowlist_url")
-            except Exception:
-                allowlist_url = None
-            # TODO: refactor into: def get_allowed_domains(allowlist_url)
-            if allowlist_url:
-                for line in urllib2.urlopen(allowlist_url).readlines():
-                    line = line.strip()
-                    # don't add blank lines or comments
-                    if not line or line.startswith('#'):
-                        continue
-                    allowed.add(line)
-
-            # category filter
-            if config.has_option(section, "categories"):
-                list_categories = config.get(section, "categories").split(',')
-            else:
-                list_categories = DEFAULT_DISCONNECT_LIST_CATEGORIES
-            list_categories = [x.split('|') for x in list_categories]
-
-            # excluded categories filter
-            if config.has_option(section, "excluded_categories"):
-                excluded_categories = config.get(
-                    section, "excluded_categories").split(',')
-                excluded_categories = [
-                    x.split('|') for x in excluded_categories]
-            else:
-                excluded_categories = list()
-
-            # dnt filter
-            if section in DNT_EFF_SECTIONS:
-                which_dnt = "eff"
-            elif section in DNT_W3C_SECTIONS:
-                which_dnt = "w3c"
-            else:
-                which_dnt = ""
-
-            # tag filter
-            try:
-                desired_tags = set(config.get(
-                    section, "disconnect_tags").split(','))
-                if len(desired_tags.difference(ALL_TAGS)) > 0:
-                    raise ValueError(
-                        "The configuration file contains unsupported tags.\n"
-                        "Supported tags: %s\nConfig file tags: %s" %
-                        (ALL_TAGS, desired_tags)
-                    )
-            except ConfigParser.NoOptionError:
-                desired_tags = DEFAULT_DISCONNECT_LIST_TAGS
-
-            # Retrieve domains that match filters
-            print("\n------ %s ------" % section)
-            print("-->blocklist: %s)" % blocklist_url)
-            blocked_domains = get_domains_from_filters(
-                parser, list_categories, excluded_categories,
-                which_dnt, desired_tags)
-
-            # Write blocklist in a format compatible with safe browsing
-            output_filename = config.get(section, "output")
-            write_safebrowsing_blocklist(
-                blocked_domains, output_filename, allowed, log_file,
-                chunknum, output_file, section
-            )
+            output_file, log_file = get_tracker_lists(
+                config, section, chunknum)
 
         if section in PLUGIN_SECTIONS:
-            output_file, log_file = get_output_and_log_files(config, section)
-
             # load the plugin blocklist
             blocked = set()
             blocklist_url = config.get(section, "blocklist")
@@ -480,6 +569,7 @@ def main():
                         continue
                     blocked.add(line)
 
+            output_file, log_file = get_output_and_log_files(config, section)
             process_plugin_blocklist(blocked, chunknum, output_file, log_file,
                                      section)
 
@@ -499,6 +589,29 @@ def main():
         log_file.close()
 
     publish_to_cloud(config, chunknum)
+
+    # create and publish versioned lists
+    resp = requests.get(GITHUB_API_URL + SHAVAR_PROD_LISTS_BRANCHES_PATH)
+    if resp:
+        shavar_prod_lists_branches = resp.json()
+        for branch in shavar_prod_lists_branches:
+            branch_name = branch.get('name')
+            ver = version.parse(branch_name)
+            if isinstance(ver, version.Version):
+                print('\n\n*** Start Versioining for {ver} ***'.format(
+                    ver=branch_name)
+                )
+                get_versioned_lists(config, chunknum, version=branch_name)
+                print('\n*** Publish Versioned Lists ***')
+                publish_to_cloud(config, chunknum, check_versioning=True)
+                print('\n*** Revert Configs ***')
+                revert_config(config, branch_name)
+            else:
+                print('\n\n*** {branch} is not a versioning branch ***'.format(
+                    branch=branch_name)
+                )
+    else:
+        print('\n\n*** Unable to get branches from shavar-prod-lists repo ***')
 
 
 if __name__ == "__main__":
