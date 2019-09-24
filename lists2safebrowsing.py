@@ -524,7 +524,7 @@ def get_versioned_lists(config, chunknum, version):
         )
         if not versioning_needed:
             continue
-        print('Version {ver} for {output}'.format(
+        print('\n*** Version {ver} for {output} ***'.format(
             ver=version, output=config.get(section, 'output'))
         )
         version_configurations(config, section, version)
@@ -595,15 +595,20 @@ def main():
             branch_name = branch.get('name')
             ver = version.parse(branch_name)
             if isinstance(ver, version.Version):
+                print('\n\n*** Start Versioining for {ver} ***'.format(
+                    ver=branch_name)
+                )
                 get_versioned_lists(config, chunknum, version=branch_name)
-                print('*** Publish Versioned Lists ***')
+                print('\n*** Publish Versioned Lists ***')
                 publish_to_cloud(config, chunknum, check_versioning=True)
-                print('*** Revert Configs ***')
+                print('\n*** Revert Configs ***')
                 revert_config(config, branch_name)
             else:
-                print(branch_name + ' is not a versioning branch')
+                print('\n\n*** {branch} is not a versioning branch ***'.format(
+                    branch=branch_name)
+                )
     else:
-        print('Unable to get branches from shavar-prod-lists repo')
+        print('\n\n*** Unable to get branches from shavar-prod-lists repo ***')
 
 
 if __name__ == "__main__":
