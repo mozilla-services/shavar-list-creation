@@ -468,20 +468,9 @@ def edit_config(config, section, option, old_value, new_value):
     )
 
 
-def version_configurations(config, section, version, revert=None):
+def version_configurations(config, section, version):
     initial_disconnect_url_val = 'master'
     initial_s3_key_value = 'tracking/'
-    if revert:
-        if config.has_option(section, 'disconnect_url'):
-            edit_config(
-                config, section, option='disconnect_url',
-                old_value=version, new_value=initial_disconnect_url_val)
-        if config.has_option(section, 's3_key'):
-            versioned_key = 'tracking/{ver}/'.format(ver=version)
-            edit_config(
-                config, section, option='s3_key',
-                old_value=versioned_key, new_value=initial_s3_key_value)
-        return
 
     if config.has_option(section, 'disconnect_url'):
         edit_config(
@@ -495,6 +484,20 @@ def version_configurations(config, section, version, revert=None):
             old_value=initial_s3_key_value, new_value=versioned_key)
 
 
+def revert_version_configurations(config, section, version):
+    initial_disconnect_url_val = 'master'
+    initial_s3_key_value = 'tracking/'
+    if config.has_option(section, 'disconnect_url'):
+        edit_config(
+            config, section, option='disconnect_url',
+            old_value=version, new_value=initial_disconnect_url_val)
+    if config.has_option(section, 's3_key'):
+        versioned_key = 'tracking/{ver}/'.format(ver=version)
+        edit_config(
+            config, section, option='s3_key',
+            old_value=versioned_key, new_value=initial_s3_key_value)
+
+
 def revert_config(config, version):
     edit_config(
         config=config, section='main', option='default_disconnect_url',
@@ -506,7 +509,7 @@ def revert_config(config, version):
         )
         if not versioning_needed:
             continue
-        version_configurations(config, section, version, revert=True)
+        revert_version_configurations(config, section, version)
 
 
 def get_versioned_lists(config, chunknum, version):
