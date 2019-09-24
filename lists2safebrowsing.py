@@ -547,7 +547,7 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
         branch_name = branch.get('name')
         ver = version.parse(branch_name)
         if isinstance(ver, version.Version):
-            print('\n\n*** Start Versioining for {ver} ***'.format(
+            print('\n\n*** Start Versioning for {ver} ***'.format(
                 ver=branch_name)
             )
             get_versioned_lists(config, chunknum, version=branch_name)
