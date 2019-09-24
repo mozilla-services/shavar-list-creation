@@ -520,6 +520,7 @@ def get_versioned_lists(config, chunknum, version):
     edit_config(
         config, section='main', option='default_disconnect_url',
         old_value='master', new_value=version)
+    did_versioning = False
     for section in config.sections():
         versioning_needed = (
             config.has_option(section, 'versioning_needed')
@@ -527,6 +528,7 @@ def get_versioned_lists(config, chunknum, version):
         )
         if not versioning_needed:
             continue
+        did_versioning = True
         print('\n*** Version {ver} for {output} ***'.format(
             ver=version, output=config.get(section, 'output'))
         )
@@ -534,9 +536,9 @@ def get_versioned_lists(config, chunknum, version):
         output_file, log_file = get_tracker_lists(
             config, section, chunknum)
 
-    if output_file:
+    if did_versioning and output_file:
         output_file.close()
-    if log_file:
+    if did_versioning and log_file:
         log_file.close()
 
 
