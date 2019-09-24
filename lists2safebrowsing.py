@@ -38,8 +38,10 @@ psl = PublicSuffixList()
 
 DISCONNECT_MAPPING = os.path.join(
     os.path.dirname(__file__), 'disconnect_mapping.json')
-GITHUB_API_URL = 'https://api.github.com/repos/mozilla-services'
-SHAVAR_PROD_LISTS_BRANCHES_PATH = '/shavar-prod-lists/branches'
+GITHUB_API_URL = 'https://api.github.com'
+SHAVAR_PROD_LISTS_BRANCHES_PATH = (
+    '/repos/mozilla-services/shavar-prod-lists/branches'
+)
 
 
 def get_output_and_log_files(config, section):
