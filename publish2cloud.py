@@ -246,7 +246,7 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
             )
             if not versioning_needed:
                 continue
-            print('Publishing versioning lists for: ' + section)
+            print('Publishing versioned lists for: ' + section)
 
         upload_to_s3 = True
         if (config.has_option(section, "s3_upload")
