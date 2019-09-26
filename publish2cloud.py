@@ -74,7 +74,7 @@ def make_record_url_remote_settings(id):
 
 def get_record_remote_settings(id):
     record_url = make_record_url_remote_settings(id)
-    resp = requests.get(record_url, auth=REMOTE_SETTINGS_AUTH)
+    resp = requests.get(record_url, auth=REMOTE_SETTINGS_AUTH, timeout=10)
     if not resp:
         print('{0} looks like it hasn\'t been uploaded to '
               'Remote Settings'.format(id))
@@ -267,8 +267,8 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
                 rs_upload_needed = new_data_to_publish_to_remote_settings(
                     config, section, new
                 )
-            except requests.exceptions.ConnectionError as exc:
-                print('Connection Error on Remote Settings.')
+            except requests.exceptions.ConnectTimeout as exc:
+                print('Connection timed out on Remote Settings.')
                 rs_upload_needed = False
             if not s3_upload_needed and not rs_upload_needed:
                 print('No new data to publish for %s' % section)
