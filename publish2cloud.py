@@ -176,8 +176,19 @@ def publish_to_s3(config, section, chunknum):
     if config.has_option(section, 's3_key'):
         key = config.get(section, 's3_key')
 
-    chunk_key = os.path.join(
-        config.get(section, os.path.basename('output')), str(chunknum))
+    versioning_needed = (
+        config.has_option(section, 'versioning_needed')
+        and config.getboolean(section, 'versioning_needed')
+    )
+    if versioning_needed:
+        chunk_key = os.path.join(
+            config.get(section, os.path.basename('output')),
+            config.get(section, 'chunk_key_version'),
+            str(chunknum)
+        )
+    else:
+        chunk_key = os.path.join(
+            config.get(section, os.path.basename('output')), str(chunknum))
 
     if not bucket or not key:
         sys.stderr.write(
