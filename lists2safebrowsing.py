@@ -483,6 +483,8 @@ def version_configurations(config, section, version):
             config, section, option='s3_key',
             old_value=initial_s3_key_value, new_value=versioned_key)
 
+    config.set(section, 'chunk_key_version', version)
+
 
 def revert_version_configurations(config, section, version):
     initial_disconnect_url_val = 'master'
