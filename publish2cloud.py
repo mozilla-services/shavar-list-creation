@@ -188,7 +188,9 @@ def publish_to_s3(config, section, chunknum):
         )
     else:
         chunk_key = os.path.join(
-            config.get(section, os.path.basename('output')), str(chunknum))
+            config.get(section, os.path.basename('output')),
+            str(chunknum)
+        )
 
     if not bucket or not key:
         sys.stderr.write(
