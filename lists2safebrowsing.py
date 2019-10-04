@@ -378,6 +378,32 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
         list_variant, publishing, output_size))
 
 
+def get_data_from_list(
+        config, section, parser, blocked_domains, list_name=None):
+    companies = set()
+    if list_name == config.get(section, 'output'):
+        domain_msg = '/// DOMAINS BLOCKED IN {0}: {1}'
+        print(domain_msg.format(list_name, len(blocked_domains)))
+        domains_file = open('domains-blocked', "wb")
+        for domain in blocked_domains:
+            domains_file.write('{},'.format(domain))
+        domains_file.close()
+
+        for domain in blocked_domains:
+            if domain in parser._company_classifier.keys():
+                companies.update([parser._company_classifier[domain]])
+            else:
+                msg = '!!! Domain {} not from the list has been blocked !!!'
+                print(msg.format(domain))
+        company_msg = '/// COMPANIES BLOCKED IN {0}: {1}'
+        print(company_msg.format(list_name, len(companies)))
+        companies_file = open('companies-blocked', "wb")
+        for comp in companies:
+            unicode_str = comp.encode('utf8')
+            companies_file.write('{},'.format(unicode_str))
+        companies_file.close()
+
+
 def get_tracker_lists(config, section, chunknum):
     if (section in FASTBLOCK_SECTIONS):
         # process fastblock
@@ -448,6 +474,9 @@ def get_tracker_lists(config, section, chunknum):
     blocked_domains = get_domains_from_filters(
         parser, list_categories, excluded_categories,
         which_dnt, desired_tags)
+    # Defaults to None if no list name is specfied
+    get_data_from_list(
+        config, section, parser, blocked_domains)
 
     output_file, log_file = get_output_and_log_files(config, section)
     # Write blocklist in a format compatible with safe browsing
