@@ -243,7 +243,7 @@ def get_domains_from_filters(parser, category_filters,
 
 
 def write_safebrowsing_blocklist(domains, output_name, allow_list, log_file,
-                                 chunk, output_file, name):
+                                 chunk, output_file, name, version):
     """Generates safebrowsing-compatible blocklist from a set of `domains`.
 
     Args:
@@ -269,9 +269,11 @@ def write_safebrowsing_blocklist(domains, output_name, allow_list, log_file,
     output = []
 
     # Add a static test domain to list
+    test_domain = TEST_DOMAIN_TEMPLATE % output_name
+    if version:
+        test_domain = '{0}.{1}'.format(version, test_domain)
     added = add_domain_to_list(
-        TEST_DOMAIN_TEMPLATE % output_name,
-        previous_domains, allow_list, log_file, output
+        test_domain, previous_domains, allow_list, log_file, output
     )
     if added:
         # TODO?: hashdata_bytes += hashdata.digest_size
@@ -452,9 +454,11 @@ def get_tracker_lists(config, section, chunknum):
     output_file, log_file = get_output_and_log_files(config, section)
     # Write blocklist in a format compatible with safe browsing
     output_filename = config.get(section, "output")
+    version = (config.has_option(section, "version")
+               and config.get(section, "version"))
     write_safebrowsing_blocklist(
         blocked_domains, output_filename, allowed, log_file,
-        chunknum, output_file, section
+        chunknum, output_file, section, version
     )
     return output_file, log_file
 
@@ -483,6 +487,8 @@ def version_configurations(config, section, version):
             config, section, option='s3_key',
             old_value=initial_s3_key_value, new_value=versioned_key)
 
+    config.set(section, 'version', version)
+
 
 def revert_version_configurations(config, section, version):
     initial_disconnect_url_val = 'master'
@@ -496,6 +502,7 @@ def revert_version_configurations(config, section, version):
         edit_config(
             config, section, option='s3_key',
             old_value=versioned_key, new_value=initial_s3_key_value)
+    config.set(section, 'version', None)
 
 
 def revert_config(config, version):
