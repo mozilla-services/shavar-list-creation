@@ -180,10 +180,10 @@ def publish_to_s3(config, section, chunknum):
         config.has_option(section, 'versioning_needed')
         and config.getboolean(section, 'versioning_needed')
     )
-    if versioning_needed and config.has_option(section, 'chunk_key_version'):
+    if versioning_needed and config.has_option(section, 'version'):
         chunk_key = os.path.join(
             config.get(section, os.path.basename('output')),
-            config.get(section, 'chunk_key_version'),
+            config.get(section, 'version'),
             str(chunknum)
         )
     else:
