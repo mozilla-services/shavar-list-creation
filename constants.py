@@ -14,7 +14,8 @@ WHITELIST_SECTIONS = (
     "entity-whitelist-testing",
     "staging-entity-whitelist",
     "fastblock1-whitelist",
-    "fastblock2-whitelist"
+    "fastblock2-whitelist",
+    "google-whitelist"
 )
 PRE_DNT_SECTIONS = (
     "tracking-protection",
@@ -81,6 +82,10 @@ FASTBLOCK_SECTIONS = (
     "fastblock2-whitelist",
     "fastblock3"
 )
+SV_SECTIONS = {
+    "google-whitelist",
+}
+
 
 FINGERPRINTING_TAG = 'fingerprinting'
 CRYPTOMINING_TAG = 'cryptominer'
@@ -102,3 +107,7 @@ DEFAULT_DISCONNECT_LIST_TAGS = {}
 LIST_TYPE_ENTITY = 'Entity'
 LIST_TYPE_PLUGIN = 'Plugin'
 LIST_TYPE_TRACKER = 'Tracker'
+
+SILLICON_VALLEY_COMPANIES = [
+    'Google',
+]

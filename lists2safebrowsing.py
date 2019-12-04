@@ -26,6 +26,7 @@ from constants import (
     FASTBLOCK_SECTIONS,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
+    SV_SECTIONS,
     TEST_DOMAIN_TEMPLATE,
     WHITELIST_SECTIONS,
 )
@@ -607,9 +608,17 @@ def main():
             # download and load the business entity oriented whitelist
             whitelist = load_json_from_url(config, section, "entity_url")
 
-            process_entity_whitelist(whitelist, chunknum,
-                                     output_file, log_file,
-                                     section)
+            if section == 'entity-whitelist' or section in SV_SECTIONS:
+                google_entitylist = {}
+                google_entitylist['Google'] = whitelist.pop('Google')
+
+            if section in SV_SECTIONS:
+                process_entity_whitelist(google_entitylist, chunknum,
+                                         output_file, log_file, section)
+            else:
+                process_entity_whitelist(whitelist, chunknum, output_file,
+                                         log_file, section)
+
 
     if output_file:
         output_file.close()
