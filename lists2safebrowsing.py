@@ -559,8 +559,12 @@ def get_versioned_lists(config, chunknum, version):
             ver=version, output=config.get(section, 'output'))
         )
         version_configurations(config, section, version)
-        output_file, log_file = get_tracker_lists(
-            config, section, chunknum)
+        if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
+            output_file, log_file = get_tracker_lists(
+                config, section, chunknum)
+
+        if section in WHITELIST_SECTIONS:
+            output_file, log_file = get_entity_lists(config, section, chunknum)
 
     if did_versioning and output_file:
         output_file.close()
