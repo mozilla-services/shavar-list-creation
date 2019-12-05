@@ -464,6 +464,24 @@ def get_tracker_lists(config, section, chunknum):
     return output_file, log_file
 
 
+def get_entity_lists(config, section, chunknum):
+    output_file, log_file = get_output_and_log_files(config, section)
+
+    # download and load the business entity oriented whitelist
+    whitelist = load_json_from_url(config, section, "entity_url")
+
+    if section == 'entity-whitelist' or section in SV_SECTIONS:
+        google_entitylist = {}
+        google_entitylist['Google'] = whitelist.pop('Google')
+
+    if section in SV_SECTIONS:
+        process_entity_whitelist(google_entitylist, chunknum,
+                                 output_file, log_file, section)
+    else:
+        process_entity_whitelist(whitelist, chunknum, output_file,
+                                 log_file, section)
+    return output_file, log_file
+
 def edit_config(config, section, option, old_value, new_value):
     current = config.get(section, option)
     edited_config = current.replace(old_value, new_value)
@@ -603,21 +621,7 @@ def main():
                                      section)
 
         if section in WHITELIST_SECTIONS:
-            output_file, log_file = get_output_and_log_files(config, section)
-
-            # download and load the business entity oriented whitelist
-            whitelist = load_json_from_url(config, section, "entity_url")
-
-            if section == 'entity-whitelist' or section in SV_SECTIONS:
-                google_entitylist = {}
-                google_entitylist['Google'] = whitelist.pop('Google')
-
-            if section in SV_SECTIONS:
-                process_entity_whitelist(google_entitylist, chunknum,
-                                         output_file, log_file, section)
-            else:
-                process_entity_whitelist(whitelist, chunknum, output_file,
-                                         log_file, section)
+            output_file, log_file = get_entity_lists(config, section, chunknum)
 
 
     if output_file:
