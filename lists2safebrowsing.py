@@ -492,16 +492,29 @@ def edit_config(config, section, option, old_value, new_value):
 
 
 def version_configurations(config, section, version):
-    initial_disconnect_url_val = 'master'
-    initial_s3_key_value = 'tracking/'
+    initial_source_url_value = 'master'
+    section_has_disconnect_url = (
+        section in PRE_DNT_SECTIONS
+        or section in DNT_SECTIONS
+        or section == 'main'
+    )
+    if section_has_disconnect_url:
+        initial_s3_key_value = 'tracking/'
+        source_url = 'disconnect_url'
+        versioned_key = 'tracking/{ver}/'.format(ver=version)
 
-    if config.has_option(section, 'disconnect_url'):
+    if section in WHITELIST_SECTIONS:
+        initial_s3_key_value = 'entity/'
+        source_url = 'entity_url'
+        versioned_key = 'entity/{ver}/'.format(ver=version)
+
+    # change the config
+    if config.has_option(section, source_url):
         edit_config(
-            config, section, option='disconnect_url',
-            old_value=initial_disconnect_url_val, new_value=version)
+            config, section, option=source_url,
+            old_value=initial_source_url_value, new_value=source_url)
 
     if config.has_option(section, 's3_key'):
-        versioned_key = 'tracking/{ver}/'.format(ver=version)
         edit_config(
             config, section, option='s3_key',
             old_value=initial_s3_key_value, new_value=versioned_key)
