@@ -491,7 +491,7 @@ def edit_config(config, section, option, old_value, new_value):
     )
 
 
-def version_configurations(config, section, version):
+def version_configurations(config, section, version, revert=False):
     initial_source_url_value = 'master'
     section_has_disconnect_url = (
         section in PRE_DNT_SECTIONS
@@ -508,33 +508,30 @@ def version_configurations(config, section, version):
         source_url = 'entity_url'
         versioned_key = 'entity/{ver}/'.format(ver=version)
 
+    old_source_url = initial_source_url_value
+    new_source_url = version
+    old_s3_key = initial_s3_key_value
+    new_s3_key = versioned_key
+    ver_val = version
+    if revert:
+        old_source_url = version
+        new_source_url = initial_source_url_value
+        old_s3_key = versioned_key
+        new_s3_key = initial_s3_key_value
+        ver_val = None
+
     # change the config
     if config.has_option(section, source_url):
         edit_config(
             config, section, option=source_url,
-            old_value=initial_source_url_value, new_value=source_url)
+            old_value=old_source_url, new_value=new_source_url)
 
     if config.has_option(section, 's3_key'):
         edit_config(
             config, section, option='s3_key',
-            old_value=initial_s3_key_value, new_value=versioned_key)
+            old_value=old_s3_key, new_value=new_s3_key)
 
-    config.set(section, 'version', version)
-
-
-def revert_version_configurations(config, section, version):
-    initial_disconnect_url_val = 'master'
-    initial_s3_key_value = 'tracking/'
-    if config.has_option(section, 'disconnect_url'):
-        edit_config(
-            config, section, option='disconnect_url',
-            old_value=version, new_value=initial_disconnect_url_val)
-    if config.has_option(section, 's3_key'):
-        versioned_key = 'tracking/{ver}/'.format(ver=version)
-        edit_config(
-            config, section, option='s3_key',
-            old_value=versioned_key, new_value=initial_s3_key_value)
-    config.set(section, 'version', None)
+    config.set(section, 'version', ver_val)
 
 
 def revert_config(config, version):
@@ -548,7 +545,7 @@ def revert_config(config, version):
         )
         if not versioning_needed:
             continue
-        revert_version_configurations(config, section, version)
+        version_configurations(config, section, version, revert=True)
 
 
 def get_versioned_lists(config, chunknum, version):
