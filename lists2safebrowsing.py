@@ -270,15 +270,25 @@ def write_safebrowsing_blocklist(domains, output_name, allow_list, log_file,
 
     # Add a static test domain to list
     test_domain = TEST_DOMAIN_TEMPLATE % output_name
-    if version:
-        test_domain = '{0}-{1}'.format(version.replace('.', '-'), test_domain)
+    num_test_domain_added = 0
     added = add_domain_to_list(
         test_domain, previous_domains, allow_list, log_file, output
     )
     if added:
+        num_test_domain_added += 1
+
+    if version:
+        test_domain = '{0}-{1}'.format(version.replace('.', '-'), test_domain)
+        added = add_domain_to_list(
+            test_domain, previous_domains, allow_list, log_file, output
+        )
+        if added:
+            num_test_domain_added += 1
+
+    if num_test_domain_added > 0:
         # TODO?: hashdata_bytes += hashdata.digest_size
-        hashdata_bytes += 32
-        publishing += 1
+        hashdata_bytes += (32 * num_test_domain_added)
+        publishing += num_test_domain_added
 
     for d in domains:
         added = add_domain_to_list(
