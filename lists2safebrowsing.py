@@ -10,7 +10,7 @@ import sys
 import time
 import urllib2
 
-from packaging import version
+from packaging import version as p_version
 from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
 
@@ -585,8 +585,8 @@ def get_versioned_lists(config, chunknum, version):
 def start_versioning(config, chunknum, shavar_prod_lists_branches):
     for branch in shavar_prod_lists_branches:
         branch_name = branch.get('name')
-        ver = version.parse(branch_name)
-        if isinstance(ver, version.Version):
+        ver = p_version.parse(branch_name)
+        if isinstance(ver, p_version.Version):
             print('\n\n*** Start Versioning for {ver} ***'.format(
                 ver=branch_name)
             )
