@@ -23,6 +23,7 @@ from constants import (
     DNT_EFF_SECTIONS,
     DNT_SECTIONS,
     DNT_W3C_SECTIONS,
+    VER_SV_SEPARATION_STARTED,
     FASTBLOCK_SECTIONS,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
@@ -465,12 +466,24 @@ def get_tracker_lists(config, section, chunknum):
 
 
 def get_entity_lists(config, section, chunknum):
+    if config.has_option(section, 'version'):
+        version = config.get(section, 'version')
+        ver = p_version.parse(version)
+
+    channel_needs_separation = (
+        not config.has_option(section, 'version')
+        or (ver.release[0] >= VER_SV_SEPARATION_STARTED)
+    )
+
+    list_needs_separation = (
+        section == 'entity-whitelist' or section in SV_SECTIONS
+    )
     output_file, log_file = get_output_and_log_files(config, section)
 
     # download and load the business entity oriented whitelist
     whitelist = load_json_from_url(config, section, "entity_url")
 
-    if section == 'entity-whitelist' or section in SV_SECTIONS:
+    if channel_needs_separation and list_needs_separation:
         google_entitylist = {}
         google_entitylist['Google'] = whitelist.pop('Google')
 
