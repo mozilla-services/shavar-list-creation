@@ -587,6 +587,13 @@ def get_versioned_lists(config, chunknum, version):
                 config, section, chunknum)
 
         if section in WHITELIST_SECTIONS:
+            ver = p_version.parse(version)
+            skip_sv_separation = (
+                ver.release[0] < VER_SV_SEPARATION_STARTED
+                and section in SV_SECTIONS
+            )
+            if skip_sv_separation:
+                continue
             output_file, log_file = get_entity_lists(config, section, chunknum)
 
     if did_versioning and output_file:
