@@ -467,12 +467,11 @@ def get_tracker_lists(config, section, chunknum):
 
 def get_entity_lists(config, section, chunknum):
     if config.has_option(section, 'version'):
-        version = config.get(section, 'version')
-        ver = p_version.parse(version)
+        version = p_version.parse(config.get(section, 'version'))
 
     channel_needs_separation = (
         not config.has_option(section, 'version')
-        or (ver.release[0] >= VER_SV_SEPARATION_STARTED)
+        or (version.release[0] >= VER_SV_SEPARATION_STARTED)
     )
 
     list_needs_separation = (

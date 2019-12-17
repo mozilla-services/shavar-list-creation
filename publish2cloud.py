@@ -263,10 +263,9 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
             if not versioning_needed:
                 continue
 
-            version = config.get(section, 'version')
-            ver = p_version.parse(version)
+            version = p_version.parse(config.get(section, 'version'))
             skip_sv_separation = (
-                ver.release[0] < VER_SV_SEPARATION_STARTED
+                version.release[0] < VER_SV_SEPARATION_STARTED
                 and section in SV_SECTIONS
             )
             if skip_sv_separation:
