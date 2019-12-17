@@ -11,9 +11,11 @@ import boto.s3.key
 from constants import (
     DEFAULT_DISCONNECT_LIST_CATEGORIES,
     DNT_SECTIONS,
+    HEADER_SIZE,
     LIST_TYPE_ENTITY,
     LIST_TYPE_TRACKER,
     LIST_TYPE_PLUGIN,
+    MAX_CHUNK_SIZE,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
     WHITELIST_SECTIONS,
@@ -276,6 +278,15 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
 
         with open(config.get(section, 'output'), 'rb') as blob:
             new = chunk_metadata(blob)
+            file_size = int(new['len']) + HEADER_SIZE
+            if file_size >= MAX_CHUNK_SIZE:
+                exceeded_max_size_msg = ('!!! {} NOT UPLOADED. '
+                    'File size is {} which exceeded max size {} !!!')
+                print(exceeded_max_size_msg.format(
+                    config.get(section, 'output'), file_size, MAX_CHUNK_SIZE)
+                )
+                continue
+
             s3_upload_needed = new_data_to_publish_to_s3(config, section, new)
             try:
                 rs_upload_needed = new_data_to_publish_to_remote_settings(
