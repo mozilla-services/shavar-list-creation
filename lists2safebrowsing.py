@@ -475,7 +475,8 @@ def get_entity_lists(config, section, chunknum):
     )
 
     list_needs_separation = (
-        section == 'entity-whitelist' or section in SV_SECTIONS
+        # section == 'entity-whitelist' or section in SV_SECTIONS
+        section in SV_SECTIONS
     )
     output_file, log_file = get_output_and_log_files(config, section)
 
