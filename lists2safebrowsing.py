@@ -10,7 +10,7 @@ import sys
 import time
 import urllib2
 
-from packaging import version
+from packaging import version as p_version
 from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
 
@@ -23,9 +23,11 @@ from constants import (
     DNT_EFF_SECTIONS,
     DNT_SECTIONS,
     DNT_W3C_SECTIONS,
+    VER_SV_SEPARATION_STARTED,
     FASTBLOCK_SECTIONS,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
+    LARGE_ENTITIES_SECTIONS,
     TEST_DOMAIN_TEMPLATE,
     WHITELIST_SECTIONS,
 )
@@ -473,6 +475,36 @@ def get_tracker_lists(config, section, chunknum):
     return output_file, log_file
 
 
+def get_entity_lists(config, section, chunknum):
+    if config.has_option(section, 'version'):
+        version = p_version.parse(config.get(section, 'version'))
+
+    channel_needs_separation = (
+        not config.has_option(section, 'version')
+        or (version.release[0] >= VER_SV_SEPARATION_STARTED)
+    )
+
+    list_needs_separation = (
+        # section == 'entity-whitelist' or section in LARGE_ENTITIES_SECTIONS
+        section in LARGE_ENTITIES_SECTIONS
+    )
+    output_file, log_file = get_output_and_log_files(config, section)
+
+    # download and load the business entity oriented whitelist
+    whitelist = load_json_from_url(config, section, "entity_url")
+
+    if channel_needs_separation and list_needs_separation:
+        google_entitylist = {}
+        google_entitylist['Google'] = whitelist.pop('Google')
+
+    if section in LARGE_ENTITIES_SECTIONS:
+        process_entity_whitelist(google_entitylist, chunknum,
+                                 output_file, log_file, section)
+    else:
+        process_entity_whitelist(whitelist, chunknum, output_file,
+                                 log_file, section)
+    return output_file, log_file
+
 def edit_config(config, section, option, old_value, new_value):
     current = config.get(section, option)
     edited_config = current.replace(old_value, new_value)
@@ -482,37 +514,47 @@ def edit_config(config, section, option, old_value, new_value):
     )
 
 
-def version_configurations(config, section, version):
-    initial_disconnect_url_val = 'master'
-    initial_s3_key_value = 'tracking/'
+def version_configurations(config, section, version, revert=False):
+    initial_source_url_value = 'master'
+    section_has_disconnect_url = (
+        section in PRE_DNT_SECTIONS
+        or section in DNT_SECTIONS
+        or section == 'main'
+    )
+    if section_has_disconnect_url:
+        initial_s3_key_value = 'tracking/'
+        source_url = 'disconnect_url'
+        versioned_key = 'tracking/{ver}/'.format(ver=version)
 
-    if config.has_option(section, 'disconnect_url'):
+    if section in WHITELIST_SECTIONS:
+        initial_s3_key_value = 'entity/'
+        source_url = 'entity_url'
+        versioned_key = 'entity/{ver}/'.format(ver=version)
+
+    old_source_url = initial_source_url_value
+    new_source_url = version
+    old_s3_key = initial_s3_key_value
+    new_s3_key = versioned_key
+    ver_val = version
+    if revert:
+        old_source_url = version
+        new_source_url = initial_source_url_value
+        old_s3_key = versioned_key
+        new_s3_key = initial_s3_key_value
+        ver_val = None
+
+    # change the config
+    if config.has_option(section, source_url):
         edit_config(
-            config, section, option='disconnect_url',
-            old_value=initial_disconnect_url_val, new_value=version)
+            config, section, option=source_url,
+            old_value=old_source_url, new_value=new_source_url)
 
     if config.has_option(section, 's3_key'):
-        versioned_key = 'tracking/{ver}/'.format(ver=version)
         edit_config(
             config, section, option='s3_key',
-            old_value=initial_s3_key_value, new_value=versioned_key)
+            old_value=old_s3_key, new_value=new_s3_key)
 
-    config.set(section, 'version', version)
-
-
-def revert_version_configurations(config, section, version):
-    initial_disconnect_url_val = 'master'
-    initial_s3_key_value = 'tracking/'
-    if config.has_option(section, 'disconnect_url'):
-        edit_config(
-            config, section, option='disconnect_url',
-            old_value=version, new_value=initial_disconnect_url_val)
-    if config.has_option(section, 's3_key'):
-        versioned_key = 'tracking/{ver}/'.format(ver=version)
-        edit_config(
-            config, section, option='s3_key',
-            old_value=versioned_key, new_value=initial_s3_key_value)
-    config.set(section, 'version', None)
+    config.set(section, 'version', ver_val)
 
 
 def revert_config(config, version):
@@ -526,7 +568,7 @@ def revert_config(config, version):
         )
         if not versioning_needed:
             continue
-        revert_version_configurations(config, section, version)
+        version_configurations(config, section, version, revert=True)
 
 
 def get_versioned_lists(config, chunknum, version):
@@ -550,8 +592,19 @@ def get_versioned_lists(config, chunknum, version):
             ver=version, output=config.get(section, 'output'))
         )
         version_configurations(config, section, version)
-        output_file, log_file = get_tracker_lists(
-            config, section, chunknum)
+        if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
+            output_file, log_file = get_tracker_lists(
+                config, section, chunknum)
+
+        if section in WHITELIST_SECTIONS:
+            ver = p_version.parse(version)
+            skip_sv_separation = (
+                ver.release[0] < VER_SV_SEPARATION_STARTED
+                and section in LARGE_ENTITIES_SECTIONS
+            )
+            if skip_sv_separation:
+                continue
+            output_file, log_file = get_entity_lists(config, section, chunknum)
 
     if did_versioning and output_file:
         output_file.close()
@@ -562,8 +615,8 @@ def get_versioned_lists(config, chunknum, version):
 def start_versioning(config, chunknum, shavar_prod_lists_branches):
     for branch in shavar_prod_lists_branches:
         branch_name = branch.get('name')
-        ver = version.parse(branch_name)
-        if isinstance(ver, version.Version):
+        ver = p_version.parse(branch_name)
+        if isinstance(ver, p_version.Version):
             print('\n\n*** Start Versioning for {ver} ***'.format(
                 ver=branch_name)
             )
@@ -612,14 +665,8 @@ def main():
                                      section)
 
         if section in WHITELIST_SECTIONS:
-            output_file, log_file = get_output_and_log_files(config, section)
+            output_file, log_file = get_entity_lists(config, section, chunknum)
 
-            # download and load the business entity oriented whitelist
-            whitelist = load_json_from_url(config, section, "entity_url")
-
-            process_entity_whitelist(whitelist, chunknum,
-                                     output_file, log_file,
-                                     section)
 
     if output_file:
         output_file.close()
