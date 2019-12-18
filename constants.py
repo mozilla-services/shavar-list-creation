@@ -82,7 +82,7 @@ FASTBLOCK_SECTIONS = (
     "fastblock2-whitelist",
     "fastblock3"
 )
-SV_SECTIONS = {
+LARGE_ENTITIES_SECTIONS = {
     "google-whitelist",
 }
 

@@ -17,7 +17,7 @@ from constants import (
     LIST_TYPE_PLUGIN,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
-    SV_SECTIONS,
+    LARGE_ENTITIES_SECTIONS,
     WHITELIST_SECTIONS,
 )
 from packaging import version as p_version
@@ -266,7 +266,7 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
             version = p_version.parse(config.get(section, 'version'))
             skip_sv_separation = (
                 version.release[0] < VER_SV_SEPARATION_STARTED
-                and section in SV_SECTIONS
+                and section in LARGE_ENTITIES_SECTIONS
             )
             if skip_sv_separation:
                 continue

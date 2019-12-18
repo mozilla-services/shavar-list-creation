@@ -27,7 +27,7 @@ from constants import (
     FASTBLOCK_SECTIONS,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
-    SV_SECTIONS,
+    LARGE_ENTITIES_SECTIONS,
     TEST_DOMAIN_TEMPLATE,
     WHITELIST_SECTIONS,
 )
@@ -475,8 +475,8 @@ def get_entity_lists(config, section, chunknum):
     )
 
     list_needs_separation = (
-        # section == 'entity-whitelist' or section in SV_SECTIONS
-        section in SV_SECTIONS
+        # section == 'entity-whitelist' or section in LARGE_ENTITIES_SECTIONS
+        section in LARGE_ENTITIES_SECTIONS
     )
     output_file, log_file = get_output_and_log_files(config, section)
 
@@ -487,7 +487,7 @@ def get_entity_lists(config, section, chunknum):
         google_entitylist = {}
         google_entitylist['Google'] = whitelist.pop('Google')
 
-    if section in SV_SECTIONS:
+    if section in LARGE_ENTITIES_SECTIONS:
         process_entity_whitelist(google_entitylist, chunknum,
                                  output_file, log_file, section)
     else:
@@ -590,7 +590,7 @@ def get_versioned_lists(config, chunknum, version):
             ver = p_version.parse(version)
             skip_sv_separation = (
                 ver.release[0] < VER_SV_SEPARATION_STARTED
-                and section in SV_SECTIONS
+                and section in LARGE_ENTITIES_SECTIONS
             )
             if skip_sv_separation:
                 continue
