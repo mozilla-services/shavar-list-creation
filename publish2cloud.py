@@ -11,13 +11,16 @@ import boto.s3.key
 from constants import (
     DEFAULT_DISCONNECT_LIST_CATEGORIES,
     DNT_SECTIONS,
+    VER_SV_SEPARATION_STARTED,
     LIST_TYPE_ENTITY,
     LIST_TYPE_TRACKER,
     LIST_TYPE_PLUGIN,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
+    LARGE_ENTITIES_SECTIONS,
     WHITELIST_SECTIONS,
 )
+from packaging import version as p_version
 
 CONFIG = ConfigParser.SafeConfigParser(os.environ)
 CONFIG.read(['shavar_list_creation.ini'])
@@ -202,6 +205,7 @@ def publish_to_s3(config, section, chunknum):
     for key_name in (chunk_key, key):
         k = boto.s3.key.Key(bucket)
         k.key = key_name
+        k.set_acl = 'bucket-owner-full-control'
         k.set_contents_from_filename(output_filename)
     print('Uploaded to s3: %s' % section)
 
@@ -258,6 +262,14 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
                 and config.getboolean(section, 'versioning_needed')
             )
             if not versioning_needed:
+                continue
+
+            version = p_version.parse(config.get(section, 'version'))
+            skip_sv_separation = (
+                version.release[0] < VER_SV_SEPARATION_STARTED
+                and section in LARGE_ENTITIES_SECTIONS
+            )
+            if skip_sv_separation:
                 continue
             print('Publishing versioned lists for: ' + section)
 
