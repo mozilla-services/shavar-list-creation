@@ -506,6 +506,7 @@ def get_entity_lists(config, section, chunknum):
                                  log_file, section)
     return output_file, log_file
 
+
 def edit_config(config, section, option, old_value, new_value):
     current = config.get(section, option)
     edited_config = current.replace(old_value, new_value)
@@ -599,11 +600,11 @@ def get_versioned_lists(config, chunknum, version):
 
         if section in WHITELIST_SECTIONS:
             ver = p_version.parse(version)
-            skip_sv_separation = (
-                ver.release[0] < VER_SV_SEPARATION_STARTED
+            skip_large_entity_separation = (
+                ver.release[0] < VER_LARGE_ENTITIES_SEPARATION_STARTED
                 and section in LARGE_ENTITIES_SECTIONS
             )
-            if skip_sv_separation:
+            if skip_large_entity_separation:
                 continue
             output_file, log_file = get_entity_lists(config, section, chunknum)
 
@@ -667,7 +668,6 @@ def main():
 
         if section in WHITELIST_SECTIONS:
             output_file, log_file = get_entity_lists(config, section, chunknum)
-
 
     if output_file:
         output_file.close()
