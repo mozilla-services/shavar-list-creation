@@ -23,12 +23,13 @@ from constants import (
     DNT_EFF_SECTIONS,
     DNT_SECTIONS,
     DNT_W3C_SECTIONS,
-    VER_SV_SEPARATION_STARTED,
     FASTBLOCK_SECTIONS,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
     LARGE_ENTITIES_SECTIONS,
+    STANDARD_ENTITY_SECTION,
     TEST_DOMAIN_TEMPLATE,
+    VER_LARGE_ENTITIES_SEPARATION_STARTED,
     WHITELIST_SECTIONS,
 )
 from publish2cloud import (
@@ -481,12 +482,12 @@ def get_entity_lists(config, section, chunknum):
 
     channel_needs_separation = (
         not config.has_option(section, 'version')
-        or (version.release[0] >= VER_SV_SEPARATION_STARTED)
+        or (version.release[0] >= VER_LARGE_ENTITIES_SEPARATION_STARTED)
     )
 
     list_needs_separation = (
-        # section == 'entity-whitelist' or section in LARGE_ENTITIES_SECTIONS
-        section in LARGE_ENTITIES_SECTIONS
+        section == STANDARD_ENTITY_SECTION
+        or section in LARGE_ENTITIES_SECTIONS
     )
     output_file, log_file = get_output_and_log_files(config, section)
 
