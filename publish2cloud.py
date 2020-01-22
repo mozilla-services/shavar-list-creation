@@ -11,7 +11,7 @@ import boto.s3.key
 from constants import (
     DEFAULT_DISCONNECT_LIST_CATEGORIES,
     DNT_SECTIONS,
-    VER_LARGE_ENTITIES_SEPARATION_STARTED,
+    VERS_LARGE_ENTITIES_SEPARATION_STARTED,
     LIST_TYPE_ENTITY,
     LIST_TYPE_TRACKER,
     LIST_TYPE_PLUGIN,
@@ -266,7 +266,7 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
 
             version = p_version.parse(config.get(section, 'version'))
             skip_large_entity_separation = (
-                version.release[0] < VER_LARGE_ENTITIES_SEPARATION_STARTED
+                version.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
                 and section in LARGE_ENTITIES_SECTIONS
             )
             if skip_large_entity_separation:

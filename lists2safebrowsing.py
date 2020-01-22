@@ -29,7 +29,7 @@ from constants import (
     LARGE_ENTITIES_SECTIONS,
     STANDARD_ENTITY_SECTION,
     TEST_DOMAIN_TEMPLATE,
-    VER_LARGE_ENTITIES_SEPARATION_STARTED,
+    VERS_LARGE_ENTITIES_SEPARATION_STARTED,
     WHITELIST_SECTIONS,
 )
 from publish2cloud import (
@@ -482,7 +482,7 @@ def get_entity_lists(config, section, chunknum):
 
     channel_needs_separation = (
         not config.has_option(section, 'version')
-        or (version.release[0] >= VER_LARGE_ENTITIES_SEPARATION_STARTED)
+        or (version.release[0] >= VERS_LARGE_ENTITIES_SEPARATION_STARTED)
     )
 
     list_needs_separation = (
@@ -601,7 +601,7 @@ def get_versioned_lists(config, chunknum, version):
         if section in WHITELIST_SECTIONS:
             ver = p_version.parse(version)
             skip_large_entity_separation = (
-                ver.release[0] < VER_LARGE_ENTITIES_SEPARATION_STARTED
+                ver.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
                 and section in LARGE_ENTITIES_SECTIONS
             )
             if skip_large_entity_separation:
