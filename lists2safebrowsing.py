@@ -23,12 +23,13 @@ from constants import (
     DNT_EFF_SECTIONS,
     DNT_SECTIONS,
     DNT_W3C_SECTIONS,
-    VER_SV_SEPARATION_STARTED,
     FASTBLOCK_SECTIONS,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
     LARGE_ENTITIES_SECTIONS,
+    STANDARD_ENTITY_SECTION,
     TEST_DOMAIN_TEMPLATE,
+    VERS_LARGE_ENTITIES_SEPARATION_STARTED,
     WHITELIST_SECTIONS,
 )
 from publish2cloud import (
@@ -481,12 +482,12 @@ def get_entity_lists(config, section, chunknum):
 
     channel_needs_separation = (
         not config.has_option(section, 'version')
-        or (version.release[0] >= VER_SV_SEPARATION_STARTED)
+        or (version.release[0] >= VERS_LARGE_ENTITIES_SEPARATION_STARTED)
     )
 
     list_needs_separation = (
-        # section == 'entity-whitelist' or section in LARGE_ENTITIES_SECTIONS
-        section in LARGE_ENTITIES_SECTIONS
+        section == STANDARD_ENTITY_SECTION
+        or section in LARGE_ENTITIES_SECTIONS
     )
     output_file, log_file = get_output_and_log_files(config, section)
 
@@ -504,6 +505,7 @@ def get_entity_lists(config, section, chunknum):
         process_entity_whitelist(whitelist, chunknum, output_file,
                                  log_file, section)
     return output_file, log_file
+
 
 def edit_config(config, section, option, old_value, new_value):
     current = config.get(section, option)
@@ -598,11 +600,11 @@ def get_versioned_lists(config, chunknum, version):
 
         if section in WHITELIST_SECTIONS:
             ver = p_version.parse(version)
-            skip_sv_separation = (
-                ver.release[0] < VER_SV_SEPARATION_STARTED
+            skip_large_entity_separation = (
+                ver.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
                 and section in LARGE_ENTITIES_SECTIONS
             )
-            if skip_sv_separation:
+            if skip_large_entity_separation:
                 continue
             output_file, log_file = get_entity_lists(config, section, chunknum)
 
@@ -666,7 +668,6 @@ def main():
 
         if section in WHITELIST_SECTIONS:
             output_file, log_file = get_entity_lists(config, section, chunknum)
-
 
     if output_file:
         output_file.close()
