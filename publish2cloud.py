@@ -205,8 +205,7 @@ def publish_to_s3(config, section, chunknum):
     for key_name in (chunk_key, key):
         k = boto.s3.key.Key(bucket)
         k.key = key_name
-        k.set_acl = 'bucket-owner-full-control'
-        k.set_contents_from_filename(output_filename)
+        k.set_contents_from_filename(output_filename, policy='bucket-owner-full-control')
     print('Uploaded to s3: %s' % section)
 
 
