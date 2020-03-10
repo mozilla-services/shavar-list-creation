@@ -1,4 +1,8 @@
 # pipenv
+bin/
+lib/
+local/
+share/
 Pipfile*
 
 # Output and test files
