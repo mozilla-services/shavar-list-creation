@@ -39,8 +39,6 @@ from publish2cloud import (
 updatePSL()
 psl = PublicSuffixList()
 
-DISCONNECT_MAPPING = os.path.join(
-    os.path.dirname(__file__), 'disconnect_mapping.json')
 GITHUB_API_URL = 'https://api.github.com'
 SHAVAR_PROD_LISTS_BRANCHES_PATH = (
     '/repos/mozilla-services/shavar-prod-lists/branches'
@@ -182,7 +180,7 @@ def get_domains_from_filters(parser, category_filters,
     Parameters
     ----------
     parser : DisconnectParser
-        An instance of the parser set to remap the Disconnect category
+        An instance of the Disconnect list parser
     category_filters : list of list of strings
         A filter to restrict output to the specified top-level categories.
         Each filter should be a comma-separated list of top-level categories
@@ -400,10 +398,7 @@ def get_tracker_lists(config, section, chunknum):
     else:
         # process disconnect
         blocklist_url = get_list_url(config, section, "disconnect_url")
-    parser = DisconnectParser(
-        blocklist_url=blocklist_url,
-        disconnect_mapping=DISCONNECT_MAPPING
-    )
+    parser = DisconnectParser(blocklist_url=blocklist_url)
 
     # load our allowlist
     allowed = set()

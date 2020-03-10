@@ -101,8 +101,7 @@ ALL_TAGS = {
 
 TEST_DOMAIN_TEMPLATE = '%s.dummytracker.org'
 
-DEFAULT_DISCONNECT_LIST_CATEGORIES = [
-    'Advertising|Analytics|Social|Disconnect']
+DEFAULT_DISCONNECT_LIST_CATEGORIES = ['Advertising|Analytics|Social']
 DEFAULT_DISCONNECT_LIST_TAGS = {}
 
 LIST_TYPE_ENTITY = 'Entity'
