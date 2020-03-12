@@ -44,12 +44,15 @@ try:
             CONFIG.get('main', 'remote_settings_username'),
             CONFIG.get('main', 'remote_settings_password')
         )
+    CLOUDFRONT_USER_ID = os.environ.get('CLOUDFRONT_USER_ID', None)
+
 except ConfigParser.NoOptionError as err:
     REMOTE_SETTINGS_URL = ''
     REMOTE_SETTINGS_AUTH = None
     REMOTE_SETTINGS_BUCKET = ''
     REMOTE_SETTINGS_COLLECTION = ''
     REMOTE_SETTINGS_RECORD_PATH = ''
+    CLOUDFRONT_USER_ID = None
 
 
 def chunk_metadata(fp):
@@ -154,6 +157,9 @@ def new_data_to_publish_to_s3(config, section, new):
             key.set_contents_from_string('a:1:32:32\n' + 32 * '1')
         current = tempfile.TemporaryFile()
         key.get_contents_to_file(current)
+        key.set_acl('bucket-owner-full-control')
+        if CLOUDFRONT_USER_ID is not None:
+            key.add_user_grant('READ', CLOUDFRONT_USER_ID)
         current.seek(0)
     else:
         current = open(config.get(section, 'output'), 'rb')
@@ -205,7 +211,10 @@ def publish_to_s3(config, section, chunknum):
     for key_name in (chunk_key, key):
         k = boto.s3.key.Key(bucket)
         k.key = key_name
-        k.set_contents_from_filename(output_filename, policy='bucket-owner-full-control')
+        k.set_contents_from_filename(output_filename)
+        k.set_acl('bucket-owner-full-control')
+        if CLOUDFRONT_USER_ID is not None:
+            k.add_user_grant('READ', CLOUDFRONT_USER_ID)
     print('Uploaded to s3: %s' % section)
 
 
