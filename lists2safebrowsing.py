@@ -23,7 +23,6 @@ from constants import (
     DNT_EFF_SECTIONS,
     DNT_SECTIONS,
     DNT_W3C_SECTIONS,
-    FASTBLOCK_SECTIONS,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
     LARGE_ENTITIES_SECTIONS,
@@ -306,12 +305,8 @@ def write_safebrowsing_blocklist(domains, output_name, allow_list, log_file,
     if output_file:
         output_file.write(output_string)
 
-    if (name in FASTBLOCK_SECTIONS):
-        print("Fastblock(%s): publishing %d items; file size %d" % (
-            name, publishing, len(output_string)))
-    else:
-        print("Tracking protection(%s): publishing %d items; file size %d" % (
-            name, publishing, len(output_string)))
+    print("Tracking protection(%s): publishing %d items; file size %d" % (
+        name, publishing, len(output_string)))
     return
 
 
@@ -352,12 +347,8 @@ def process_entity_whitelist(incoming, chunk, output_file,
 
     output_file.flush()
     output_size = os.fstat(output_file.fileno()).st_size
-    if(list_variant in FASTBLOCK_SECTIONS):
-        print("Fastblock whitelist(%s): publishing %d items; file size %d" % (
-            list_variant, publishing, output_size))
-    else:
-        print("Entity whitelist(%s): publishing %d items; file size %d" % (
-            list_variant, publishing, output_size))
+    print("Entity whitelist(%s): publishing %d items; file size %d" % (
+        list_variant, publishing, output_size))
 
 
 def process_plugin_blocklist(incoming, chunk, output_file, log_file,
@@ -392,12 +383,7 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
 
 
 def get_tracker_lists(config, section, chunknum):
-    if (section in FASTBLOCK_SECTIONS):
-        # process fastblock
-        blocklist_url = get_list_url(config, section, "blocklist_url")
-    else:
-        # process disconnect
-        blocklist_url = get_list_url(config, section, "disconnect_url")
+    blocklist_url = get_list_url(config, section, "disconnect_url")
     parser = DisconnectParser(blocklist_url=blocklist_url)
 
     # load our allowlist
