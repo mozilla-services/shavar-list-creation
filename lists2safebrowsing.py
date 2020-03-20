@@ -35,6 +35,26 @@ from constants import (
 from publish2cloud import (
     publish_to_cloud
 )
+import argparse
+
+parser = argparse.ArgumentParser(description='Activate debug messages')
+parser.add_argument('-d', '--debug-all', action='store_true', 
+    help="Show all debug messages")
+parser.add_argument('-dn', '--debug-domains', action='store_true', 
+    help="Show debug messages for get_domains_from_category_filters and get_domains_from_filters")
+parser.add_argument('-b', '--debug-blocklist', action='store_true', 
+    help="Show debug messages for blocklist functions")
+parser.add_argument('-w', '--debug-whitelist', action='store_true', 
+    help="Show debug messages for whitelist functions")
+parser.add_argument('-c', '--debug-configs', action='store_true', 
+    help="Show debug messages for all configuration functions")
+parser.add_argument('-v', '--debug-versions', action='store_true', 
+    help="Show debug messages for all version functions")
+parser.add_argument('-t', '--debug-tracker', action='store_true', 
+    help="Show debug messages for get_tracker_lists")
+
+
+args = parser.parse_args()
 
 updatePSL()
 psl = PublicSuffixList()
@@ -162,15 +182,17 @@ def get_domains_from_category_filters(parser, category_filters):
             (category_filters, type(category_filters))
         )
     output = parser.get_domains_with_category(category_filters[0])
-    print(" * filter %s matched %d domains"
-          % (category_filters[0], len(output)))
+    if args.debug_all or args.debug_domains:
+        print(" * filter %s matched %d domains"
+             % (category_filters[0], len(output)))
     for category_filter in category_filters[1:]:
         result = parser.get_domains_with_category(category_filter)
         output.intersection_update(result)
-        print(
-            " * filter %s matched %d domains. Reduced set to %d items."
-            % (category_filter, len(result), len(output))
-        )
+        if args.debug_all or args.debug_domains:
+            print(
+                " * filter %s matched %d domains. Reduced set to %d items."
+                % (category_filter, len(result), len(output))
+            )
     return output
 
 
@@ -221,25 +243,29 @@ def get_domains_from_filters(parser, category_filters,
                 parser, category_exclusion_filters
             )
         )
-        print(" * exclusion filters removed %d domains from output"
-              % (before - len(output)))
+        if args.debug_all or args.debug_domains:
+            print(" * exclusion filters removed %d domains from output"
+                  % (before - len(output)))
 
     # Filter by DNT tag
     if dnt_filter == "":
         result = parser.get_domains_with_tag(["w3c", "eff"])
         output = output.difference(result)
-        print(" * removing %d rule(s) due to DNT exceptions" % len(result))
+        if args.debug_all or args.debug_domains:
+            print(" * removing %d rule(s) due to DNT exceptions" % len(result))
     else:
         result = parser.get_domains_with_tag(dnt_filter)
         output = output.intersection(result)
-        print(" * found %d rule(s) with DNT filter %s. Filtered output to %d" %
+        if args.debug_all or args.debug_domains:
+            print(" * found %d rule(s) with DNT filter %s. Filtered output to %d" %
               (len(result), dnt_filter, len(output)))
 
     # Apply tag filters
     if len(tag_filters) > 0:
         result = parser.get_domains_with_tag(tag_filters)
         output = output.intersection(result)
-        print(" * found %d rule(s) with filter %s. Filtered output to %d." %
+        if args.debug_all or args.debug_domains:
+            print(" * found %d rule(s) with filter %s. Filtered output to %d." %
               (len(result), tag_filters, len(output)))
 
     return output
@@ -308,12 +334,13 @@ def write_safebrowsing_blocklist(domains, output_name, allow_list, log_file,
     if output_file:
         output_file.write(output_string)
 
-    if (name in FASTBLOCK_SECTIONS):
+    if (name in FASTBLOCK_SECTIONS) and (args.debug_all or args.debug_blocklist):
         print("Fastblock(%s): publishing %d items; file size %d" % (
             name, publishing, len(output_string)))
     else:
-        print("Tracking protection(%s): publishing %d items; file size %d" % (
-            name, publishing, len(output_string)))
+        if args.debug_all or args.debug_blocklist:
+            print("Tracking protection(%s): publishing %d items; file size %d" % (
+                name, publishing, len(output_string)))
     return
 
 
@@ -354,12 +381,13 @@ def process_entity_whitelist(incoming, chunk, output_file,
 
     output_file.flush()
     output_size = os.fstat(output_file.fileno()).st_size
-    if(list_variant in FASTBLOCK_SECTIONS):
+    if(list_variant in FASTBLOCK_SECTIONS) and (args.debug_all or args.debug_whitelist):
         print("Fastblock whitelist(%s): publishing %d items; file size %d" % (
             list_variant, publishing, output_size))
     else:
-        print("Entity whitelist(%s): publishing %d items; file size %d" % (
-            list_variant, publishing, output_size))
+        if args.debug_all or args.debug_whitelist:
+            print("Entity whitelist(%s): publishing %d items; file size %d" % (
+                list_variant, publishing, output_size))
 
 
 def process_plugin_blocklist(incoming, chunk, output_file, log_file,
@@ -389,8 +417,9 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
 
     output_file.flush()
     output_size = os.fstat(output_file.fileno()).st_size
-    print("Plugin blocklist(%s): publishing %d items; file size %d" % (
-        list_variant, publishing, output_size))
+    if args.debug_all or args.debug_blocklist:
+        print("Plugin blocklist(%s): publishing %d items; file size %d" % (
+            list_variant, publishing, output_size))
 
 
 def get_tracker_lists(config, section, chunknum):
@@ -458,8 +487,9 @@ def get_tracker_lists(config, section, chunknum):
         desired_tags = DEFAULT_DISCONNECT_LIST_TAGS
 
     # Retrieve domains that match filters
-    print("\n------ %s ------" % section)
-    print("-->blocklist: %s)" % blocklist_url)
+    if args.debug_all or args.debug_tracker:
+        print("\n------ %s ------" % section)
+        print("-->blocklist: %s)" % blocklist_url)
     blocked_domains = get_domains_from_filters(
         parser, list_categories, excluded_categories,
         which_dnt, desired_tags)
@@ -511,9 +541,10 @@ def edit_config(config, section, option, old_value, new_value):
     current = config.get(section, option)
     edited_config = current.replace(old_value, new_value)
     config.set(section, option, edited_config)
-    print('Edited {opt} in {sect} to: {new}'.format(
-        opt=option, sect=section, new=config.get(section, option))
-    )
+    if args.debug_all or args.debug_configs:
+        print('Edited {opt} in {sect} to: {new}'.format(
+            opt=option, sect=section, new=config.get(section, option))
+        )
 
 
 def version_configurations(config, section, version, revert=False):
@@ -590,9 +621,10 @@ def get_versioned_lists(config, chunknum, version):
         if not versioning_needed:
             continue
         did_versioning = True
-        print('\n*** Version {ver} for {output} ***'.format(
-            ver=version, output=config.get(section, 'output'))
-        )
+        if args.debug_all or args.debug_versions:
+            print('\n*** Version {ver} for {output} ***'.format(
+                ver=version, output=config.get(section, 'output'))
+            )
         version_configurations(config, section, version)
         if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
             output_file, log_file = get_tracker_lists(
@@ -618,7 +650,7 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
     for branch in shavar_prod_lists_branches:
         branch_name = branch.get('name')
         ver = p_version.parse(branch_name)
-        if isinstance(ver, p_version.Version):
+        if isinstance(ver, p_version.Version) and (args.debug_all or args.debug_versions):
             print('\n\n*** Start Versioning for {ver} ***'.format(
                 ver=branch_name)
             )
@@ -628,9 +660,10 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
             print('\n*** Revert Configs ***')
             revert_config(config, branch_name)
         else:
-            print('\n\n*** {branch} is not a versioning branch ***'.format(
-                branch=branch_name)
-            )
+            if args.debug_all or args.debug_versions:
+                print('\n\n*** {branch} is not a versioning branch ***'.format(
+                    branch=branch_name)
+                )
 
 
 def main():
