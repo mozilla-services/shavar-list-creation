@@ -21,6 +21,20 @@ from constants import (
     WHITELIST_SECTIONS,
 )
 from packaging import version as p_version
+import argparse
+
+parser = argparse.ArgumentParser(description='Activate debug messages')
+parser.add_argument('-d', '--debug-all', action='store_true', 
+    help="Show all debug messages")
+parser.add_argument('-r', '--debug-remote', action='store_true', 
+    help="Show debug messages for remote setting functions")
+parser.add_argument('-s3', '--debug-s3', action='store_true', 
+    help="Show debug messages for publish_to_s3 and function")
+parser.add_argument('-c', '--debug-cloud', action='store_true', 
+    help="Show debug messages for publish_to_cloud  function")
+    
+args = parser.parse_args()
+
 
 CONFIG = ConfigParser.SafeConfigParser(os.environ)
 CONFIG.read(['shavar_list_creation.ini'])
@@ -81,7 +95,7 @@ def make_record_url_remote_settings(id):
 def get_record_remote_settings(id):
     record_url = make_record_url_remote_settings(id)
     resp = requests.get(record_url, auth=REMOTE_SETTINGS_AUTH, timeout=10)
-    if not resp:
+    if not resp and (args.debug_all or args.debug_remote):
         print('{0} looks like it hasn\'t been uploaded to '
               'Remote Settings'.format(id))
         return None
@@ -94,7 +108,7 @@ def put_new_record_remote_settings(config, section, data):
     rec_resp = requests.put(
         record_url, json={'data': data}, auth=REMOTE_SETTINGS_AUTH)
 
-    if not rec_resp:
+    if not rec_resp and (args.debug_all or args.debug_remote):
         print('Failed to create/update record for %s. Error: %s' %
               (data['Name'], rec_resp.content))
         return rec_resp
@@ -123,7 +137,7 @@ def new_data_to_publish_to_remote_settings(config, section, new):
                                      and REMOTE_SETTINGS_COLLECTION
                                      and REMOTE_SETTINGS_RECORD_PATH
                                      and REMOTE_SETTINGS_AUTH)
-    if not remote_settings_config_exists:
+    if not remote_settings_config_exists and (args.debug_all or args.debug_remote):
         print('Missing config(s) for Remote Settings')
         return False
 
@@ -150,8 +164,9 @@ def new_data_to_publish_to_s3(config, section, new):
         key = bucket.get_key(s3key)
         if key is None:
             # most likely a new list
-            print('{0} looks like it hasn\'t been uploaded to '
-                  's3://{1}/{2}'.format(section, bucket.name, s3key))
+            if args.debug_all or args.debug_s3:
+                print('{0} looks like it hasn\'t been uploaded to '
+                      's3://{1}/{2}'.format(section, bucket.name, s3key))
             key = boto.s3.key.Key(bucket)
             key.key = s3key
             key.set_contents_from_string('a:1:32:32\n' + 32 * '1')
@@ -215,7 +230,8 @@ def publish_to_s3(config, section, chunknum):
         k.set_acl('bucket-owner-full-control')
         if CLOUDFRONT_USER_ID is not None:
             k.add_user_grant('READ', CLOUDFRONT_USER_ID)
-    print('Uploaded to s3: %s' % section)
+    if args.debug_all or args.debug_s3:
+        print('Uploaded to s3: %s' % section)
 
 
 def publish_to_remote_settings(config, section):
@@ -254,7 +270,8 @@ def publish_to_remote_settings(config, section):
         'Checksum': chunk_file['checksum']
     }
     put_new_record_remote_settings(config, section, record_data)
-    print('Uploaded to remote settings: %s' % list_name)
+    if args.debug_all or args.debug_remote:
+        print('Uploaded to remote settings: %s' % list_name)
 
 
 def publish_to_cloud(config, chunknum, check_versioning=None):
@@ -279,7 +296,8 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
             )
             if skip_large_entity_separation:
                 continue
-            print('Publishing versioned lists for: ' + section)
+            if args.debug_all:
+                print('Publishing versioned lists for: ' + section)
 
         upload_to_s3 = True
         if (config.has_option(section, "s3_upload")
@@ -301,18 +319,22 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
                     config, section, new
                 )
             except requests.exceptions.ConnectTimeout as exc:
-                print('Connection timed out on Remote Settings.')
+                if args.debug_all or args.debug_cloud:
+                    print('Connection timed out on Remote Settings.')
                 rs_upload_needed = False
             if not s3_upload_needed and not rs_upload_needed:
-                print('No new data to publish for %s' % section)
+                if args.debug_all or args.debug_cloud:
+                    print('No new data to publish for %s' % section)
                 continue
 
         if s3_upload_needed and upload_to_s3:
             publish_to_s3(config, section, chunknum)
         else:
-            print('Skipping S3 upload for %s' % section)
+            if args.debug_all or args.debug_cloud:
+                print('Skipping S3 upload for %s' % section)
 
         if rs_upload_needed and upload_to_remote_setting:
             publish_to_remote_settings(config, section)
         else:
-            print('Skipping Remote Settings upload for %s' % section)
+            if args.debug_all or args.debug_cloud:
+                print('Skipping Remote Settings upload for %s' % section)
