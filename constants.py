@@ -101,3 +101,11 @@ LARGE_ENTITIES = [
 ]
 
 VERS_LARGE_ENTITIES_SEPARATION_STARTED = 74
+
+ACCESS_TOKEN = ''
+REPO_NAME = 'shavar-prod-lists'
+TARGET_BRANCH = 'updated_fingerprinting_list'
+FINGERPRINTING_FILE_PATH = 'normalized-lists/base-fingerprinting-track.json'
+COMMIT_MESSAGE = 'Updating fingerprinting list'
+PR_TITLE = 'Updating fingerprinting list'
+PR_DESCRIPTION = ''

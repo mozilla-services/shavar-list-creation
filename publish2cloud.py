@@ -19,8 +19,16 @@ from constants import (
     PRE_DNT_SECTIONS,
     LARGE_ENTITIES_SECTIONS,
     WHITELIST_SECTIONS,
+    ACCESS_TOKEN,
+    REPO_NAME,
+    TARGET_BRANCH,
+    FINGERPRINTING_FILE_PATH,
+    COMMIT_MESSAGE,
+    PR_DESCRIPTION,
+    PR_TITLE
 )
 from packaging import version as p_version
+from github import Github, UnknownObjectException
 
 CONFIG = ConfigParser.SafeConfigParser(os.environ)
 CONFIG.read(['shavar_list_creation.ini'])
@@ -256,6 +264,33 @@ def publish_to_remote_settings(config, section):
     put_new_record_remote_settings(config, section, record_data)
     print('Uploaded to remote settings: %s' % list_name)
 
+def update_fingerprinting_json():
+    g = Github(ACCESS_TOKEN)
+    repo = g.get_user().get_repo(REPO_NAME)
+    list_of_branches = list(repo.get_branches())
+
+    for branch in list_of_branches:
+        branch_name = str(branch.name)
+
+        #creating a new branch
+        branch_repo = repo.get_branch(branch_name)
+        branch_for_pr = 'refs/heads/' + TARGET_BRANCH + "_" + branch_name
+        branch_for_pr_name = TARGET_BRANCH + "_" + branch_name
+        repo.create_git_ref(ref=branch_for_pr, sha=branch_repo.commit.sha)
+        
+        #getting file 
+        with open('base-fingerprinting-track.json', 'r') as file:
+            data = file.read()
+        
+        #creating a new commit
+        try:
+            contents = repo.get_contents(FINGERPRINTING_FILE_PATH, ref=branch_for_pr_name)
+            repo.update_file(contents.path, COMMIT_MESSAGE, data, contents.sha, branch=branch_for_pr_name)
+        except UnknownObjectException:
+            repo.create_file(FINGERPRINTING_FILE_PATH, COMMIT_MESSAGE, data, branch=branch_for_pr_name)
+
+        #creating a pull request
+        pr = repo.create_pull(title=PR_TITLE, body=PR_DESCRIPTION, head=branch_for_pr_name, base=branch_name)
 
 def publish_to_cloud(config, chunknum, check_versioning=None):
     # Optionally upload to S3. If s3_upload is set, then s3_bucket and s3_key
