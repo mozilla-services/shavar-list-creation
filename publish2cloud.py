@@ -298,8 +298,12 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
         with open(config.get(section, 'output'), 'rb') as blob:
             new = chunk_metadata(blob)
             file_size = int(new['len']) + HEADER_SIZE
-            assert file_size < MAX_CHUNK_SIZE,("!!! {} NOT UPLOADED."
-            "File size is {} which exceeded max size {} !!!").format(config.get(section, 'output'), file_size, MAX_CHUNK_SIZE)
+            assert_msg = ("!!! {} NOT UPLOADED."
+            "File size is {} which exceeded max size {} !!!".format(config.get(section, 'output'), file_size, MAX_CHUNK_SIZE)")
+            if version >= 73:
+                assert file_size < 4*MAX_CHUNK_SIZE,assert_msg
+            else:
+                assert file_size < MAX_CHUNK_SIZE, assert_msg
 
             s3_upload_needed = new_data_to_publish_to_s3(config, section, new)
             try:
