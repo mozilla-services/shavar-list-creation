@@ -398,7 +398,12 @@ def get_data_from_list(
     if list_name == config.get(section, 'output'):
         domain_msg = '/// DOMAINS BLOCKED IN {0}: {1}'
         print(domain_msg.format(list_name, len(blocked_domains)))
-        domains_file = open('domains-blocked', "wb")
+
+        if config.has_option(section, 'version'):
+            version = config.get(section, 'version')
+        else:
+            version = 'master'
+        domains_file = open('domains-blocked-' + version, "wb")
         for domain in blocked_domains:
             domains_file.write('{},'.format(domain))
         domains_file.close()
@@ -411,7 +416,7 @@ def get_data_from_list(
                 print(msg.format(domain))
         company_msg = '/// COMPANIES BLOCKED IN {0}: {1}'
         print(company_msg.format(list_name, len(companies)))
-        companies_file = open('companies-blocked', "wb")
+        companies_file = open('companies-blocked-' + version, "wb")
         for comp in companies:
             unicode_str = comp.encode('utf8')
             companies_file.write('{},'.format(unicode_str))
@@ -490,7 +495,7 @@ def get_tracker_lists(config, section, chunknum):
         which_dnt, desired_tags)
     # Defaults to None if no list name is specfied
     get_data_from_list(
-        config, section, parser, blocked_domains)
+        config, section, parser, blocked_domains, 'base-fingerprinting-track-digest256')
 
     output_file, log_file = get_output_and_log_files(config, section)
     # Write blocklist in a format compatible with safe browsing
