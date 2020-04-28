@@ -13,8 +13,6 @@ WHITELIST_SECTIONS = (
     "entity-whitelist",
     "entity-whitelist-testing",
     "staging-entity-whitelist",
-    "fastblock1-whitelist",
-    "fastblock2-whitelist",
     "google-whitelist"
 )
 PRE_DNT_SECTIONS = (
@@ -53,10 +51,7 @@ DNT_SECTIONS = (
     "tracking-protection-content-fingerprinting",
     "tracking-protection-base-cryptomining",
     "tracking-protection-content-cryptomining",
-    "tracking-protection-test-multitag",
-    "fastblock1",
-    "fastblock2",
-    "fastblock3"
+    "tracking-protection-test-multitag"
 )
 DNT_CONTENT_SECTIONS = (
     "tracking-protection-content",
@@ -75,16 +70,10 @@ DNT_W3C_SECTIONS = (
     "tracking-protection-basew3c",
     "tracking-protection-contentw3c"
 )
-FASTBLOCK_SECTIONS = (
-    "fastblock1",
-    "fastblock1-whitelist",
-    "fastblock2",
-    "fastblock2-whitelist",
-    "fastblock3"
-)
 LARGE_ENTITIES_SECTIONS = {
     "google-whitelist",
 }
+STANDARD_ENTITY_SECTION = 'entity-whitelist'
 
 
 FINGERPRINTING_TAG = 'fingerprinting'
@@ -100,8 +89,7 @@ ALL_TAGS = {
 
 TEST_DOMAIN_TEMPLATE = '%s.dummytracker.org'
 
-DEFAULT_DISCONNECT_LIST_CATEGORIES = [
-    'Advertising|Analytics|Social|Disconnect']
+DEFAULT_DISCONNECT_LIST_CATEGORIES = ['Advertising|Analytics|Social']
 DEFAULT_DISCONNECT_LIST_TAGS = {}
 
 LIST_TYPE_ENTITY = 'Entity'
@@ -112,4 +100,4 @@ LARGE_ENTITIES = [
     'Google',
 ]
 
-VER_SV_SEPARATION_STARTED = 73
+VERS_LARGE_ENTITIES_SEPARATION_STARTED = 74

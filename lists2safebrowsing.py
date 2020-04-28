@@ -23,12 +23,12 @@ from constants import (
     DNT_EFF_SECTIONS,
     DNT_SECTIONS,
     DNT_W3C_SECTIONS,
-    VER_SV_SEPARATION_STARTED,
-    FASTBLOCK_SECTIONS,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
     LARGE_ENTITIES_SECTIONS,
+    STANDARD_ENTITY_SECTION,
     TEST_DOMAIN_TEMPLATE,
+    VERS_LARGE_ENTITIES_SEPARATION_STARTED,
     WHITELIST_SECTIONS,
 )
 from publish2cloud import (
@@ -38,8 +38,6 @@ from publish2cloud import (
 updatePSL()
 psl = PublicSuffixList()
 
-DISCONNECT_MAPPING = os.path.join(
-    os.path.dirname(__file__), 'disconnect_mapping.json')
 GITHUB_API_URL = 'https://api.github.com'
 SHAVAR_PROD_LISTS_BRANCHES_PATH = (
     '/repos/mozilla-services/shavar-prod-lists/branches'
@@ -181,7 +179,7 @@ def get_domains_from_filters(parser, category_filters,
     Parameters
     ----------
     parser : DisconnectParser
-        An instance of the parser set to remap the Disconnect category
+        An instance of the Disconnect list parser
     category_filters : list of list of strings
         A filter to restrict output to the specified top-level categories.
         Each filter should be a comma-separated list of top-level categories
@@ -307,12 +305,8 @@ def write_safebrowsing_blocklist(domains, output_name, allow_list, log_file,
     if output_file:
         output_file.write(output_string)
 
-    if (name in FASTBLOCK_SECTIONS):
-        print("Fastblock(%s): publishing %d items; file size %d" % (
-            name, publishing, len(output_string)))
-    else:
-        print("Tracking protection(%s): publishing %d items; file size %d" % (
-            name, publishing, len(output_string)))
+    print("Tracking protection(%s): publishing %d items; file size %d" % (
+        name, publishing, len(output_string)))
     return
 
 
@@ -353,12 +347,8 @@ def process_entity_whitelist(incoming, chunk, output_file,
 
     output_file.flush()
     output_size = os.fstat(output_file.fileno()).st_size
-    if(list_variant in FASTBLOCK_SECTIONS):
-        print("Fastblock whitelist(%s): publishing %d items; file size %d" % (
-            list_variant, publishing, output_size))
-    else:
-        print("Entity whitelist(%s): publishing %d items; file size %d" % (
-            list_variant, publishing, output_size))
+    print("Entity whitelist(%s): publishing %d items; file size %d" % (
+        list_variant, publishing, output_size))
 
 
 def process_plugin_blocklist(incoming, chunk, output_file, log_file,
@@ -424,16 +414,8 @@ def get_data_from_list(
 
 
 def get_tracker_lists(config, section, chunknum):
-    if (section in FASTBLOCK_SECTIONS):
-        # process fastblock
-        blocklist_url = get_list_url(config, section, "blocklist_url")
-    else:
-        # process disconnect
-        blocklist_url = get_list_url(config, section, "disconnect_url")
-    parser = DisconnectParser(
-        blocklist_url=blocklist_url,
-        disconnect_mapping=DISCONNECT_MAPPING
-    )
+    blocklist_url = get_list_url(config, section, "disconnect_url")
+    parser = DisconnectParser(blocklist_url=blocklist_url)
 
     # load our allowlist
     allowed = set()
@@ -515,12 +497,12 @@ def get_entity_lists(config, section, chunknum):
 
     channel_needs_separation = (
         not config.has_option(section, 'version')
-        or (version.release[0] >= VER_SV_SEPARATION_STARTED)
+        or (version.release[0] >= VERS_LARGE_ENTITIES_SEPARATION_STARTED)
     )
 
     list_needs_separation = (
-        # section == 'entity-whitelist' or section in LARGE_ENTITIES_SECTIONS
-        section in LARGE_ENTITIES_SECTIONS
+        section == STANDARD_ENTITY_SECTION
+        or section in LARGE_ENTITIES_SECTIONS
     )
     output_file, log_file = get_output_and_log_files(config, section)
 
@@ -538,6 +520,7 @@ def get_entity_lists(config, section, chunknum):
         process_entity_whitelist(whitelist, chunknum, output_file,
                                  log_file, section)
     return output_file, log_file
+
 
 def edit_config(config, section, option, old_value, new_value):
     current = config.get(section, option)
@@ -632,11 +615,11 @@ def get_versioned_lists(config, chunknum, version):
 
         if section in WHITELIST_SECTIONS:
             ver = p_version.parse(version)
-            skip_sv_separation = (
-                ver.release[0] < VER_SV_SEPARATION_STARTED
+            skip_large_entity_separation = (
+                ver.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
                 and section in LARGE_ENTITIES_SECTIONS
             )
-            if skip_sv_separation:
+            if skip_large_entity_separation:
                 continue
             output_file, log_file = get_entity_lists(config, section, chunknum)
 
@@ -700,7 +683,6 @@ def main():
 
         if section in WHITELIST_SECTIONS:
             output_file, log_file = get_entity_lists(config, section, chunknum)
-
 
     if output_file:
         output_file.close()
