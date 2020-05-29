@@ -299,6 +299,11 @@ def write_safebrowsing_blocklist(domains, output_name, allow_list, log_file,
             hashdata_bytes += 32
             publishing += 1
 
+    if output_name == "base-fingerprinting-track-digest256":
+        domain_list = list(previous_domains)
+        with open("base-fingerprinting-track.json", 'w') as f:
+            json.dump(domain_list, f, indent=4)
+         
     # Write safebrowsing-list format header
     output_string = "a:%u:32:%s\n" % (chunk, hashdata_bytes)
     output_string += ''.join(output)

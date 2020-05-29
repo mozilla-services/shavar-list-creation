@@ -4,3 +4,4 @@ requests==2.20.0
 trackingprotection_tools==0.4.6
 packaging==19.2
 setuptools==40.8.0
+PyGithub==1.45
