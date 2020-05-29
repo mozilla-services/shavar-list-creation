@@ -25,14 +25,20 @@ generates safebrowsing-compatible digest list files to be served by
     pip install -r requirements.txt
     ```
 
-3. Copy the `sample_shavar_list_creation.ini` file to
+3. Run the unit tests (currently under development):
+
+    ```
+    python -m pytest -v
+    ```
+
+4. Copy the `sample_shavar_list_creation.ini` file to
    `shavar_list_creation.ini`:
 
     ```
     cp sample_shavar_list_creation.ini shavar_list_creation.ini
     ```
 
-4. Run the `lists2safebrowsing.py` script:
+5. Run the `lists2safebrowsing.py` script:
 
     ```
     ./lists2safebrowsing.py
