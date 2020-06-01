@@ -124,8 +124,8 @@ def canonicalize(d):
         else:
             _path += i
 
-    # Note: we do NOT append the scheme
-    # because safebrowsing lookups ignore it
+    # Note: we do NOT append the scheme and the port because
+    # safebrowsing lookups ignore them
     return host + "/" + _path
 
 
