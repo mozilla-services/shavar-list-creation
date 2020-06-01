@@ -96,6 +96,9 @@ def canonicalize(d):
         if (d == _d):
             break
 
+    # remove leading and trailing whitespace
+    d = d.strip()
+
     # extract hostname (scheme://)(username(:password)@)hostname(:port)(/...)
     # extract path
     # TODO?: use urlparse ?
