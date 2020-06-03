@@ -4,10 +4,12 @@ from lists2safebrowsing import canonicalize
 
 
 CANONICALIZE_TESTCASES = (
+    ("dummy_tracking_domain", "https://base-fingerprinting-track-digest256."
+        "dummytracker.org/tracker.js", "base-fingerprinting-track-digest256."
+        "dummytracker.org/tracker.js"),
     ("no_change_1", "www.google.com/", "www.google.com/"),
     ("no_change_2", "evil.com/foo;", "evil.com/foo;"),
-    ("remove_scheme_1", "http://www.google.com/", "www.google.com/"),
-    ("remove_scheme_2", "https://www.securesite.com/", "www.securesite.com/"),
+    ("remove_scheme", "http://www.google.com/", "www.google.com/"),
     ("remove_port", "http://www.gotaport.com:1234/", "www.gotaport.com/"),
     ("add_trailing_slash_1", "www.google.com", "www.google.com/"),
     ("add_trailing_slash_2", "http://notrailingslash.com",
