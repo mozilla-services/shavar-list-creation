@@ -117,6 +117,9 @@ def canonicalize(d):
         query_params = path[query_index:]
         path = path[:query_index]
     path = re.sub(r"\/\/+", "/", path)
+    if re.search(r"\/\.\.?(\/|$)", path):
+        raise ValueError("Invalid path: '%s'. Paths should not contain "
+                         "'/../' or '/./' sequences" % path)
     path = path + query_params
 
     # remove leading and trailing dots

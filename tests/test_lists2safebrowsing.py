@@ -67,6 +67,10 @@ def test_canonicalize_invalid_input():
     """Test that canonicalize raises a ValueError when input is invalid."""
     with pytest.raises(ValueError):
         canonicalize("http://3279880203/blah")
+    with pytest.raises(ValueError):
+        canonicalize("http://www.google.com/blah/..")
+    with pytest.raises(ValueError):
+        canonicalize("http://www.google.com/foo/./bar")
 
 
 @pytest.mark.parametrize("url,expected",
