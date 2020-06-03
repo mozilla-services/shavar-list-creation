@@ -16,6 +16,13 @@ CANONICALIZE_TESTCASES = (
         "www.google.com/"),
     ("remove_surrounding_whitespace_2", "%20%20http://www.google.com%20%20",
         "www.google.com/"),
+    ("handle_hostname_spaces_1", "http:// leadingspace.com/",
+        "%20leadingspace.com/"),
+    ("handle_hostname_spaces_2", "http://%20leadingspace.com/",
+        "%20leadingspace.com/"),
+    # FIXME: Enable this test case when we update canonicalize to use urlparse
+    # ("handle_hostname_spaces_3", "%20leadingspace.com/",
+    #    "%20leadingspace.com/"),
     ("remove_tab_cr_lf", "http://www.google.com/foo\tbar\rbaz\n2",
         "www.google.com/foobarbaz2"),
     ("remove_fragment", "http://www.evil.com/blah#frag", "www.evil.com/blah"),
@@ -36,6 +43,9 @@ CANONICALIZE_TESTCASES = (
         "secure=updateuserdataxplimnbqmn-xplmvalidateinfoswqpcmlx=hgplmcx/",
         "195.127.0.11/uploads/%20%20%20%20/.verify/.eBaysecure=updateuserdata"
         "xplimnbqmn-xplmvalidateinfoswqpcmlx=hgplmcx/"),
+    ("unescape_url_8", "http://host%23.com/%257Ea%2521b%2540c%2523d%2524e%25f%"
+        "255E00%252611%252A22%252833%252944_55%252B", "host%23.com/~a!b@c%23d$"
+        "e%25f^00&11*22(33)44_55+"),
     ("remove_leading_dots_from_hostname", "http://...www.google.com/",
         "www.google.com/"),
     ("remove_trailing_dots_from_hostname", "http://www.google.com.../",
@@ -54,7 +64,9 @@ CANONICALIZE_TESTCASES = (
     ("query_parameters_4", "http://evil.com/foo?bar;", "evil.com/foo?bar;"),
     ("query_parameters_5", "http://www.google.com/q?r//s/..",
         "www.google.com/q?r//s/.."),
-    ("percent_escape_hash", "http://host.com/ab%23cd", "host.com/ab%23cd"),
+    ("percent_escape_special_chars_1", "http://host.com/ab%23cd",
+        "host.com/ab%23cd"),
+    ("percent_escape_special_chars_2", "http://\x01\x8a.com/", "%01%8A.com/"),
 )
 
 

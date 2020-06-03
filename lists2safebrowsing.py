@@ -134,17 +134,19 @@ def canonicalize(d):
     # lowercase the whole thing
     host = host.lower()
 
-    # percent-escape any characters <= ASCII 32, >= 127, or '#' or '%'
-    _path = ""
-    for i in path:
-        if (ord(i) <= 32 or ord(i) >= 127 or i == '#' or i == '%'):
-            _path += urllib2.quote(i)
-        else:
-            _path += i
-
     # Note: we do NOT append the scheme and the port because
     # safebrowsing lookups ignore them
-    return host + "/" + _path[1:]
+    url = host + "/" + path[1:]
+
+    # percent-escape any characters <= ASCII 32, >= 127, or '#' or '%'
+    _url = ""
+    for i in url:
+        if (ord(i) <= 32 or ord(i) >= 127 or i == '#' or i == '%'):
+            _url += urllib2.quote(i)
+        else:
+            _url += i
+
+    return _url
 
 
 def add_domain_to_list(domain, previous_domains, allow_list, log_file, output):
