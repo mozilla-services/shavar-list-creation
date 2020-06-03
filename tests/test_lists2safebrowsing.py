@@ -21,12 +21,14 @@ CANONICALIZE_TESTCASES = (
     ("remove_fragment", "http://www.evil.com/blah#frag", "www.evil.com/blah"),
     ("remove_multiple_fragments", "http://evil.com/foo#bar#baz",
         "evil.com/foo"),
-    ("unescape_url_1", "http://host/%25%32%35", "host/%25"),
-    ("unescape_url_2", "http://host/%25%32%35%25%32%35", "host/%25%25"),
-    ("unescape_url_3", "http://host/%2525252525252525", "host/%25"),
-    ("unescape_url_4", "http://host/asdf%25%32%35asd", "host/asdf%25asd"),
-    ("unescape_url_5", "http://host/%%%25%32%35asd%%",
-        "host/%25%25%25asd%25%25"),
+    ("unescape_url_1", "http://host.com/%25%32%35", "host.com/%25"),
+    ("unescape_url_2", "http://host.com/%25%32%35%25%32%35",
+        "host.com/%25%25"),
+    ("unescape_url_3", "http://host.com/%2525252525252525", "host.com/%25"),
+    ("unescape_url_4", "http://host.com/asdf%25%32%35asd",
+        "host.com/asdf%25asd"),
+    ("unescape_url_5", "http://host.com/%%%25%32%35asd%%",
+        "host.com/%25%25%25asd%25%25"),
     ("unescape_url_6", "http://%31%36%38%2e%31%38%38%2e%39%39%2e%32%36/%2E%73"
         "%65%63%75%72%65/%77%77%77%2E%65%62%61%79%2E%63%6F%6D/",
         "168.188.99.26/.secure/www.ebay.com/"),
@@ -58,7 +60,13 @@ CANONICALIZE_TESTCASES = (
 
 def test_canonicalize_return_type():
     """Test that the return type of canonicalize is str."""
-    assert type(canonicalize("https://host/path")) is str
+    assert type(canonicalize("https://host.com/path")) is str
+
+
+def test_canonicalize_invalid_input():
+    """Test that canonicalize raises a ValueError when input is invalid."""
+    with pytest.raises(ValueError):
+        canonicalize("http://3279880203/blah")
 
 
 @pytest.mark.parametrize("url,expected",

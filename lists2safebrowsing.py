@@ -113,9 +113,12 @@ def canonicalize(d):
     # remove leading and trailing dots
     # TODO?: host, _subs_made = re.subn("^\.+|\.+$", "", host)
     host = re.subn(r"^\.+|\.+$", "", host)[0]
-    # replace consequtive dots with a single dot
+    # replace consecutive dots with a single dot
     # TODO?: host, _subs_made = re.subn("\.+", ".", host)
     host = re.subn(r"\.+", ".", host)[0]
+    if "." not in host:
+        raise ValueError("Invalid hostname: '%s'. Hostnames must "
+                         "contain at least one dot" % host)
     # lowercase the whole thing
     host = host.lower()
 
