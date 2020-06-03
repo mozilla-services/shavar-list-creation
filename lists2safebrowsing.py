@@ -81,7 +81,7 @@ def canonicalize(d):
 
     # remove tab (0x09), CR (0x0d), LF (0x0a)
     # TODO?: d, _subs_made = re.subn("\t|\r|\n", "", d)
-    d = re.subn("\t|\r|\n", "", d)[0]
+    d = re.sub("\t|\r|\n", "", d)
 
     # remove any URL fragment
     fragment_index = d.find("#")
@@ -108,14 +108,23 @@ def canonicalize(d):
         ), d)
     host = url_components.group(1)
     path = url_components.group(2) or ""
-    path = re.subn(r"^(\/)+", "", path)[0]
+
+    # Replace consecutive slashes in the path with a single slash but
+    # keep the query parameters intact
+    query_params = ""
+    query_index = path.find("?")
+    if query_index != -1:
+        query_params = path[query_index:]
+        path = path[:query_index]
+    path = re.sub(r"\/\/+", "/", path)
+    path = path + query_params
 
     # remove leading and trailing dots
     # TODO?: host, _subs_made = re.subn("^\.+|\.+$", "", host)
-    host = re.subn(r"^\.+|\.+$", "", host)[0]
+    host = re.sub(r"^\.+|\.+$", "", host)
     # replace consecutive dots with a single dot
     # TODO?: host, _subs_made = re.subn("\.+", ".", host)
-    host = re.subn(r"\.+", ".", host)[0]
+    host = re.sub(r"\.+", ".", host)
     if "." not in host:
         raise ValueError("Invalid hostname: '%s'. Hostnames must "
                          "contain at least one dot" % host)
@@ -132,7 +141,7 @@ def canonicalize(d):
 
     # Note: we do NOT append the scheme and the port because
     # safebrowsing lookups ignore them
-    return host + "/" + _path
+    return host + "/" + _path[1:]
 
 
 def add_domain_to_list(domain, previous_domains, allow_list, log_file, output):
