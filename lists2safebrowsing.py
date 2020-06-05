@@ -81,7 +81,7 @@ def canonicalize(d):
 
     # remove tab (0x09), CR (0x0d), LF (0x0a)
     # TODO?: d, _subs_made = re.subn("\t|\r|\n", "", d)
-    d = re.subn("\t|\r|\n", "", d)[0]
+    d = re.sub("\t|\r|\n", "", d)
 
     # remove any URL fragment
     fragment_index = d.find("#")
@@ -96,6 +96,9 @@ def canonicalize(d):
         if (d == _d):
             break
 
+    # remove leading and trailing whitespace
+    d = d.strip()
+
     # extract hostname (scheme://)(username(:password)@)hostname(:port)(/...)
     # extract path
     # TODO?: use urlparse ?
@@ -105,28 +108,45 @@ def canonicalize(d):
         ), d)
     host = url_components.group(1)
     path = url_components.group(2) or ""
-    path = re.subn(r"^(\/)+", "", path)[0]
+
+    # Replace consecutive slashes in the path with a single slash but
+    # keep the query parameters intact
+    query_params = ""
+    query_index = path.find("?")
+    if query_index != -1:
+        query_params = path[query_index:]
+        path = path[:query_index]
+    path = re.sub(r"\/\/+", "/", path)
+    if re.search(r"\/\.\.?(\/|$)", path):
+        raise ValueError("Invalid path: '%s'. Paths should not contain "
+                         "'/../' or '/./' sequences" % path)
+    path = path + query_params
 
     # remove leading and trailing dots
     # TODO?: host, _subs_made = re.subn("^\.+|\.+$", "", host)
-    host = re.subn(r"^\.+|\.+$", "", host)[0]
-    # replace consequtive dots with a single dot
+    host = re.sub(r"^\.+|\.+$", "", host)
+    # replace consecutive dots with a single dot
     # TODO?: host, _subs_made = re.subn("\.+", ".", host)
-    host = re.subn(r"\.+", ".", host)[0]
+    host = re.sub(r"\.+", ".", host)
+    if "." not in host:
+        raise ValueError("Invalid hostname: '%s'. Hostnames must "
+                         "contain at least one dot" % host)
     # lowercase the whole thing
     host = host.lower()
 
-    # percent-escape any characters <= ASCII 32, >= 127, or '#' or '%'
-    _path = ""
-    for i in path:
-        if (ord(i) <= 32 or ord(i) >= 127 or i == '#' or i == '%'):
-            _path += urllib2.quote(i)
-        else:
-            _path += i
+    # Note: we do NOT append the scheme and the port because
+    # safebrowsing lookups ignore them
+    url = host + "/" + path[1:]
 
-    # Note: we do NOT append the scheme
-    # because safebrowsing lookups ignore it
-    return host + "/" + _path
+    # percent-escape any characters <= ASCII 32, >= 127, or '#' or '%'
+    _url = ""
+    for i in url:
+        if (ord(i) <= 32 or ord(i) >= 127 or i == '#' or i == '%'):
+            _url += urllib2.quote(i)
+        else:
+            _url += i
+
+    return _url
 
 
 def add_domain_to_list(domain, previous_domains, allow_list, log_file, output):
