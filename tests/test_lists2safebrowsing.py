@@ -135,19 +135,21 @@ def test_add_domain_to_list():
     assert log_writes == expected_log_writes
 
 
-def test_add_domain_to_list_public_suffix():
-    """Test that add_domain_to_list skips public suffix domains."""
-    domain = "https://co.uk"
-    (added, canonicalized_domain, domain_hash, previous_domains,
-     log_writes, output) = _add_domain_to_list(domain, set(), [])
+def test_add_domain_to_list_psl_public():
+    """Test handling of ICANN public suffix list domains.
 
-    expected_log_writes = [call("[Public Suffix] %s; Skipping.\n" %
-                           canonicalized_domain.rstrip("/"))]
+    add_domain_to_list raises a ValueError
+    """
+    with pytest.raises(ValueError):
+        _add_domain_to_list("https://co.uk", set(), [])
 
-    assert not added
-    assert canonicalized_domain not in previous_domains
-    assert domain_hash.digest() not in output
-    assert log_writes == expected_log_writes
+
+def test_add_domain_to_list_psl_private():
+    """Test handling of private public suffix list domains.
+
+    add_domain_to_list adds them to the blocklist
+    """
+    assert _add_domain_to_list("https://apps.fbsbx.com", set(), [])[0]
 
 
 def test_add_domain_to_list_duplicate():

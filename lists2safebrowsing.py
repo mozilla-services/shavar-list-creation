@@ -36,7 +36,7 @@ from publish2cloud import (
 )
 
 updatePSL()
-psl = PublicSuffixList()
+psl = PublicSuffixList(only_icann=True)
 
 GITHUB_API_URL = 'https://api.github.com'
 SHAVAR_PROD_LISTS_BRANCHES_PATH = (
@@ -155,13 +155,14 @@ def add_domain_to_list(domain, previous_domains, allow_list, log_file, output):
     Returns `True` if a domain was added, `False` otherwise"""
     canon_d = canonicalize(domain)
     if (canon_d not in previous_domains) and (domain not in allow_list):
-        # check if the domain is in the public suffix list
+        # Check if the domain is in the public (ICANN) section of the
+        # Public Suffix List. See:
+        # https://github.com/mozilla-services/shavar-list-creation/issues/102
         # SafeBrowsing keeps trailing '/', PublicSuffix does not
         psl_d = canon_d.rstrip('/')
         if psl.publicsuffix(psl_d) == psl_d:
-            if log_file:
-                log_file.write("[Public Suffix] %s; Skipping.\n" % psl_d)
-            return False
+            raise ValueError("Domain '%s' is in the public section of "
+                             "the Public Suffix List" % psl_d)
     if log_file:
         log_file.write("[m] %s >> %s\n" % (domain, canon_d))
         log_file.write("[canonicalized] %s\n" % (canon_d))
