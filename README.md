@@ -1,5 +1,8 @@
 shavar-list-creation
 ====================
+
+[![Build Status](https://circleci.com/gh/mozilla-services/shavar-list-creation.svg?style=shield)](https://circleci.com/gh/mozilla-services/shavar-list-creation)
+
 This script fetches blocklist `.json` from urls (such as
 [shavar-prod-lists](https://github.com/mozilla-services/shavar-prod-lists)) and
 generates safebrowsing-compatible digest list files to be served by
