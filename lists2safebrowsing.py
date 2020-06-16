@@ -154,15 +154,16 @@ def add_domain_to_list(domain, previous_domains, log_file, output):
 
     Returns `True` if a domain was added, `False` otherwise"""
     canon_d = canonicalize(domain)
-    if canon_d not in previous_domains:
-        # Check if the domain is in the public (ICANN) section of the
-        # Public Suffix List. See:
-        # https://github.com/mozilla-services/shavar-list-creation/issues/102
-        # SafeBrowsing keeps trailing '/', PublicSuffix does not
-        psl_d = canon_d.rstrip('/')
-        if psl.publicsuffix(psl_d) == psl_d:
-            raise ValueError("Domain '%s' is in the public section of "
-                             "the Public Suffix List" % psl_d)
+    if canon_d in previous_domains:
+        return False
+    # Check if the domain is in the public (ICANN) section of the Public
+    # Suffix List. See:
+    # https://github.com/mozilla-services/shavar-list-creation/issues/102
+    # SafeBrowsing keeps trailing '/', PublicSuffix does not
+    psl_d = canon_d.rstrip('/')
+    if psl.publicsuffix(psl_d) == psl_d:
+        raise ValueError("Domain '%s' is in the public section of the "
+                         "Public Suffix List" % psl_d)
     if log_file:
         log_file.write("[m] %s >> %s\n" % (domain, canon_d))
         log_file.write("[canonicalized] %s\n" % (canon_d))
@@ -268,7 +269,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     """Generates safebrowsing-compatible blocklist from a set of `domains`.
 
     Args:
-      domains: a list of hostnames and/or hostname+paths to add to blocklist
+      domains: a set of hostnames and/or hostname+paths to add to blocklist
       chunk: The chunk number to use.
       output_file: A file-handle to the output file.
       log_file: A filehandle to the log file.
