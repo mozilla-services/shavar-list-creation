@@ -109,7 +109,7 @@ def _add_domain_to_list(domain, previous_domains, output):
 
     with patch("test_lists2safebrowsing.open", mock_open()):
         with open("test_blocklist.log", "w") as log_file:
-            added = add_domain_to_list(domain, previous_domains, set(),
+            added = add_domain_to_list(domain, previous_domains,
                                        log_file, output)
             log_writes = log_file.write.call_args_list
 
