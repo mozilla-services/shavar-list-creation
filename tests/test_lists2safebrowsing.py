@@ -1,9 +1,10 @@
 import hashlib
+import time
 
 import pytest
 from mock import call, patch, mock_open
 
-from lists2safebrowsing import canonicalize, add_domain_to_list
+import lists2safebrowsing as l2s
 
 
 CANONICALIZE_TESTCASES = (
@@ -74,20 +75,49 @@ CANONICALIZE_TESTCASES = (
     ("percent_escape_special_chars_2", "http://\x01\x8a.com/", "%01%8A.com/"),
 )
 
+TEST_DOMAIN_HASH = (b"q\xd8Q\xbe\x8b#\xad\xd9\xde\xdf\xa7B\x12\xf0D\xa2"
+                    "\xf2\x1d\xcfx\xeaHi\x7f8%\xb5\x99\x83\xc1\x111")
+VERSIONED_TEST_DOMAIN_HASH = (b"C]~\x9e\xfeLL\xba\xf5\x17k!5\xe4t\xc4\xcc"
+                              "\xd2g\x84\x9cJ\xcb\x83;\xf4\x9f`jjYg")
+DUMMYTRACKER_DOMAIN_HASH = (b"\xe5\xa9\x07\xc8\xff6r\xa9\xcb\xc8\xf1\xd3"
+                            "\xa2\x11\x0c\\\xbe\x7f\xdb1\xbb^\xdfD\xbcX"
+                            "\xa8\xf1U;#\xe2")
+
+WRITE_SAFEBROWSING_BLOCKLIST_TESTCASES = (
+    ("version", "78.0",
+        (3, 115, b"a:%d:32:96\n", (TEST_DOMAIN_HASH
+                                   + VERSIONED_TEST_DOMAIN_HASH
+                                   + DUMMYTRACKER_DOMAIN_HASH))),
+    ("no_version", None,
+        (2, 83, b"a:%d:32:64\n", (TEST_DOMAIN_HASH
+                                  + DUMMYTRACKER_DOMAIN_HASH))),
+    ("no_test_domains", "78.0",
+        (1, 51, b"a:%d:32:32\n", DUMMYTRACKER_DOMAIN_HASH)),
+)
+
+TEST_SECTION = "tracking-protection-test"
+
+PRINT_MSG = "%s(%s): publishing %d items; file size %d\n"
+
+
+@pytest.fixture
+def chunknum():
+    return int(time.time())
+
 
 def test_canonicalize_return_type():
     """Test that the return type of canonicalize is str."""
-    assert type(canonicalize("https://host.com/path")) is str
+    assert type(l2s.canonicalize("https://host.com/path")) is str
 
 
 def test_canonicalize_invalid_input():
     """Test that canonicalize raises a ValueError when input is invalid."""
     with pytest.raises(ValueError):
-        canonicalize("http://3279880203/blah")
+        l2s.canonicalize("http://3279880203/blah")
     with pytest.raises(ValueError):
-        canonicalize("http://www.google.com/blah/..")
+        l2s.canonicalize("http://www.google.com/blah/..")
     with pytest.raises(ValueError):
-        canonicalize("http://www.google.com/foo/./bar")
+        l2s.canonicalize("http://www.google.com/foo/./bar")
 
 
 @pytest.mark.parametrize("url,expected",
@@ -99,18 +129,18 @@ def test_canonicalize(url, expected):
     Use the test cases suggested in the Safe Browsing v2 API
     documentation with some adjustments and additions.
     """
-    assert canonicalize(url) == expected
+    assert l2s.canonicalize(url) == expected
 
 
 def _add_domain_to_list(domain, previous_domains, output):
     """Auxiliary function for add_domain_to_list tests."""
-    canonicalized_domain = canonicalize(domain)
+    canonicalized_domain = l2s.canonicalize(domain)
     domain_hash = hashlib.sha256(canonicalized_domain.encode("utf-8"))
 
     with patch("test_lists2safebrowsing.open", mock_open()):
         with open("test_blocklist.log", "w") as log_file:
-            added = add_domain_to_list(domain, previous_domains,
-                                       log_file, output)
+            added = l2s.add_domain_to_list(domain, previous_domains,
+                                           log_file, output)
             log_writes = log_file.write.call_args_list
 
     return (added, canonicalized_domain, domain_hash, previous_domains,
@@ -168,3 +198,57 @@ def test_add_domain_to_list_duplicate():
     assert not added
     assert output == [domain_hash.digest()]
     assert not log_writes
+
+
+def _write_safebrowsing_blocklist(chunknum, version):
+    """Auxiliary function for write_safebrowsing_blocklist tests."""
+    domain = CANONICALIZE_TESTCASES[0]
+    output_name = "test-track-digest256"
+
+    with patch("test_lists2safebrowsing.open", mock_open()):
+        with open(output_name, "wb") as output_file:
+            # Include the domain twice in the input set to make sure it
+            # is only added to the blocklist once
+            l2s.write_safebrowsing_blocklist(
+                {domain[1], domain[2]}, output_name, None, chunknum,
+                output_file, TEST_SECTION, version)
+
+    return output_file.write.call_args_list
+
+
+@pytest.mark.parametrize(
+    "testcase,version,expected_results",
+    [pytest.param(id, version, expected_results, id=id)
+        for id, version, expected_results
+        in WRITE_SAFEBROWSING_BLOCKLIST_TESTCASES]
+)
+def test_write_safebrowsing_blocklist(capsys, chunknum, testcase,
+                                      version, expected_results):
+    """Validate Safe Browsing v2 blocklist generation."""
+    if testcase == "no_test_domains":
+        # Store reference to original function before mocking it
+        original_add_domain_to_list = l2s.add_domain_to_list
+
+        # Only mock the first two calls, which add the test domains
+        def side_effect(*args, **kwargs):
+            side_effect.call_counter += 1
+            if side_effect.call_counter < 3:
+                return False
+            return original_add_domain_to_list(*args, **kwargs)
+
+        side_effect.call_counter = 0
+
+        with patch("lists2safebrowsing.add_domain_to_list") as m:
+            m.side_effect = side_effect
+            output_writes = _write_safebrowsing_blocklist(chunknum, version)
+    else:
+        output_writes = _write_safebrowsing_blocklist(chunknum, version)
+
+    domains_number, file_size, header, hashes = expected_results
+
+    expected_output = header % chunknum + hashes
+    expected_print = PRINT_MSG % ("Tracking protection", TEST_SECTION,
+                                  domains_number, file_size)
+
+    assert output_writes == [call(expected_output)]
+    assert capsys.readouterr().out == expected_print
