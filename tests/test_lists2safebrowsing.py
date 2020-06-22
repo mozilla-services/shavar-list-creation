@@ -200,20 +200,21 @@ def test_add_domain_to_list_duplicate():
     assert not log_writes
 
 
-def _write_safebrowsing_blocklist(chunknum, version):
+def _write_safebrowsing_blocklist(chunknum, version, write_to_file=True):
     """Auxiliary function for write_safebrowsing_blocklist tests."""
     domain = CANONICALIZE_TESTCASES[0]
     output_name = "test-track-digest256"
 
     with patch("test_lists2safebrowsing.open", mock_open()):
         with open(output_name, "wb") as output_file:
+            output_file = output_file if write_to_file else None
             # Include the domain twice in the input set to make sure it
             # is only added to the blocklist once
             l2s.write_safebrowsing_blocklist(
                 {domain[1], domain[2]}, output_name, None, chunknum,
                 output_file, TEST_SECTION, version)
 
-    return output_file.write.call_args_list
+    return output_file.write.call_args_list if write_to_file else []
 
 
 @pytest.mark.parametrize(
@@ -251,4 +252,14 @@ def test_write_safebrowsing_blocklist(capsys, chunknum, testcase,
                                   domains_number, file_size)
 
     assert output_writes == [call(expected_output)]
+    assert capsys.readouterr().out == expected_print
+
+
+def test_write_safebrowsing_blocklist_no_output_file(capsys, chunknum):
+    """Test write_safebrowsing_blocklist without an output file."""
+    _write_safebrowsing_blocklist(chunknum, "78.0", False)
+
+    expected_print = PRINT_MSG % ("Tracking protection", TEST_SECTION,
+                                  3, 115)
+
     assert capsys.readouterr().out == expected_print

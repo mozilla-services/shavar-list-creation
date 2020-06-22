@@ -319,6 +319,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     # Write safebrowsing-list format header
     output_string = "a:%u:32:%s\n" % (chunk, hashdata_bytes)
     output_string += ''.join(output)
+    # When testing on shavar-prod-lists no output file is provided
     if output_file:
         output_file.write(output_string)
 
