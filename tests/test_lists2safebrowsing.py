@@ -5,6 +5,10 @@ import pytest
 from mock import call, patch, mock_open
 
 import lists2safebrowsing as l2s
+from constants import (
+    LIST_TYPE_ENTITY,
+    LIST_TYPE_PLUGIN,
+)
 
 
 CANONICALIZE_TESTCASES = (
@@ -72,7 +76,7 @@ CANONICALIZE_TESTCASES = (
         "www.google.com/q?r//s/.."),
     ("percent_escape_special_chars_1", "http://host.com/ab%23cd",
         "host.com/ab%23cd"),
-    ("percent_escape_special_chars_2", "http://\x01\x8a.com/", "%01%8A.com/"),
+    ("percent_escape_special_chars_2", "http://\x01\x7f.com/", "%01%7F.com/"),
 )
 
 TEST_DOMAIN_HASH = (b"q\xd8Q\xbe\x8b#\xad\xd9\xde\xdf\xa7B\x12\xf0D\xa2"
@@ -95,9 +99,69 @@ WRITE_SAFEBROWSING_BLOCKLIST_TESTCASES = (
         (1, 51, b"a:%d:32:32\n", DUMMYTRACKER_DOMAIN_HASH)),
 )
 
+TEST_ENTITY_DICT = {
+    "license": "",
+    "entities": {
+      "Google": {
+        "properties": ["blogspot.com", "youtube.com"],
+        "resources": ["gmail.com", "google-analytics.com"]
+      },
+      "Twitter": {
+        "properties": ["twitter.com"],
+        "resources": ["twimg.com", "twitter.com"]
+      },
+    }
+}
+
+PROCESS_ENTITYLIST_EXPECTED_OUTPUT_WRITES = (
+    b"a:%d:32:160\n",
+    (
+        (b"\xa0\xbc\xee\xcaR\x0f\xd6\"\x8e\xf6\x7f\xb1Y\x8dM\xa1#\xdd"
+         "\x0b\x18\nn\xb1\x1d\x02SW\x89\xfc;\xc5\xb3"),
+        (b"}UA\xa3\x89e\xe6\xa0v\x1fA\xa6[\xd5+\xc3\xd9\xfe\x1d\x83\x90"
+         "\x161*\xa1f\x1e\x9ee\x9cV:"),
+        (b"\xd9`\xdd\xfe\x97\x96\xa3\xfdJ\xa89\x18\xa2Mgd}\x7f\xf2\xd1z"
+         "\x11\x13\xde(m}V{\xdb \xb2"),
+        (b"\xf3\xfa\xe4\x8a}\xd8\x8a\xae\xf3\xa0B\xe9\xc8q\xe5\xe1xL"
+         "\xc3,\x07\x95\x0f;}nK7\x03u\xea\x0e"),
+        (b"\xa8\xe9\xe3EoF\xdb\xe4\x95Q\xc7\xda8`\xf6C\x93\xd8\xf9"
+         "\xd9oB\xb5\xae\x86\x92w\"Fuw\xdf"),
+    ),
+)
+
+PROCESS_ENTITYLIST_EXPECTED_LOG_WRITE_INFO = (
+    ("Google", "blogspot.com/?resource=gmail.com",
+        "a0bceeca520fd6228ef67fb1598d4da123dd0b180a6eb11d02535789fc3bc5b3"),
+    ("Google", "blogspot.com/?resource=google-analytics.com",
+        "7d5541a38965e6a0761f41a65bd52bc3d9fe1d839016312aa1661e9e659c563a"),
+    ("Google", "youtube.com/?resource=gmail.com",
+        "d960ddfe9796a3fd4aa83918a24d67647d7ff2d17a1113de286d7d567bdb20b2"),
+    ("Google", "youtube.com/?resource=google-analytics.com",
+        "f3fae48a7dd88aaef3a042e9c871e5e1784cc32c07950f3b7d6e4b370375ea0e"),
+    ("Twitter", "twitter.com/?resource=twimg.com",
+        "a8e9e3456f46dbe49551c7da3860f64393d8f9d96f42b5ae86927722467577df"),
+)
+
+PROCESS_PLUGIN_BLOCKLIST_EXPECTED_OUTPUT_WRITES = (
+    b"a:%d:32:64\n",
+    (
+        DUMMYTRACKER_DOMAIN_HASH,
+        (b"\xbc\x9a\x8f+o\xff\xd5\x85q\xe1\x88\xbb\x11\x05E\xf8\xfb:"
+         "\xf5\x1c\xdf\x1acimPZ\x98p\xa8[\xe5"),
+    ),
+)
+
+PROCESS_PLUGIN_BLOCKLIST_EXPECTED_LOG_WRITE_INFO = (
+    (CANONICALIZE_TESTCASES[0][1], CANONICALIZE_TESTCASES[0][2],
+        "e5a907c8ff3672a9cbc8f1d3a2110c5cbe7fdb31bb5edf44bc58a8f1553b23e2"),
+    (CANONICALIZE_TESTCASES[1][1], CANONICALIZE_TESTCASES[1][2],
+        "bc9a8f2b6fffd58571e188bb110545f8fb3af51cdf1a63696d505a9870a85be5"),
+)
+
 TEST_SECTION = "tracking-protection-test"
 
 PRINT_MSG = "%s(%s): publishing %d items; file size %d\n"
+LOG_MSG = "[{}] {} >> (canonicalized) {}, hash {}\n"
 
 
 @pytest.fixture
@@ -262,4 +326,50 @@ def test_write_safebrowsing_blocklist_no_output_file(capsys, chunknum):
     expected_print = PRINT_MSG % ("Tracking protection", TEST_SECTION,
                                   3, 115)
 
+    assert capsys.readouterr().out == expected_print
+
+
+@pytest.mark.parametrize("log", [True, False], ids=["log", "no_log"])
+@pytest.mark.parametrize("list_type", [LIST_TYPE_ENTITY, LIST_TYPE_PLUGIN])
+def test_process_list(capsys, chunknum, log, list_type):
+    """Validate entity/plugin list generation."""
+    if list_type == LIST_TYPE_ENTITY:
+        incoming = TEST_ENTITY_DICT["entities"]
+        function = l2s.process_entitylist
+        header, hashes = PROCESS_ENTITYLIST_EXPECTED_OUTPUT_WRITES
+        log_info = PROCESS_ENTITYLIST_EXPECTED_LOG_WRITE_INFO
+        log_id = "entity"
+        print_id = "Entity list"
+        domains_number = 5
+    else:
+        incoming = [d[1] for d in CANONICALIZE_TESTCASES[:2]]
+        function = l2s.process_plugin_blocklist
+        header, hashes = PROCESS_PLUGIN_BLOCKLIST_EXPECTED_OUTPUT_WRITES
+        log_info = PROCESS_PLUGIN_BLOCKLIST_EXPECTED_LOG_WRITE_INFO
+        log_id = "plugin-blocklist"
+        print_id = "Plugin blocklist"
+        domains_number = 2
+
+    with patch("test_lists2safebrowsing.open", mock_open()):
+        with open("test-list.log", "w") as log_file:
+            with patch("test_lists2safebrowsing.open", mock_open()):
+                with open("test-list-digest256", "wb") as output_file:
+                    log_file = log_file if log else None
+                    function(incoming, chunknum, output_file, log_file,
+                             TEST_SECTION)
+
+    log_writes = log_file.write.call_args_list if log else []
+    output_writes = output_file.write.call_args_list
+
+    expected_output_writes = ([call(header % chunknum)]
+                              + [call(h) for h in hashes])
+
+    expected_log_writes = [call(LOG_MSG.format(log_id, *i))
+                           for i in log_info] if log else []
+
+    # FIXME: os.fstat returns 0 size for the mocked file
+    expected_print = PRINT_MSG % (print_id, TEST_SECTION, domains_number, 0)
+
+    assert output_writes == expected_output_writes
+    assert log_writes == expected_log_writes
     assert capsys.readouterr().out == expected_print
