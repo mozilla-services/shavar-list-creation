@@ -5,6 +5,7 @@ import time
 
 import pytest
 from mock import call, patch, mock_open
+from trackingprotection_tools import DisconnectParser
 
 import lists2safebrowsing as l2s
 from constants import (
@@ -80,6 +81,33 @@ CANONICALIZE_TESTCASES = (
     ("percent_escape_special_chars_1", "http://host.com/ab%23cd",
         "host.com/ab%23cd"),
     ("percent_escape_special_chars_2", "http://\x01\x7f.com/", "%01%7F.com/"),
+)
+
+CATEGORY_FILTER_TESTCASES = (
+    (
+        "single_category",
+        [["Content"]],
+        {"vimeo.com", "vimeocdn.com"},
+        (2,)
+    ),
+    (
+        "union",
+        [["Social", "Cryptomining"]],
+        {"twimg.com", "twitter.com", "twitter.jp", "webmining.co"},
+        (4,)
+    ),
+    (
+        "intersection",
+        [["Advertising"], ["Fingerprinting"]],
+        {"appcast.io"},
+        (2, (3, 1))
+    ),
+    (
+        "union_intersection",
+        [["Advertising", "Analytics"], ["Fingerprinting"]],
+        {"appcast.io", "clickguard.com"},
+        (5, (3, 2))
+    ),
 )
 
 TEST_DOMAIN_HASH = (b"q\xd8Q\xbe\x8b#\xad\xd9\xde\xdf\xa7B\x12\xf0D\xa2"
@@ -276,6 +304,36 @@ def test_add_domain_to_list_duplicate():
     assert not added
     assert output == [domain_hash.digest()]
     assert not log_writes
+
+
+@pytest.mark.parametrize(
+    "category_filters,expected_output,print_info",
+    [pytest.param(category_filters, expected_output, print_info, id=id)
+        for id, category_filters, expected_output, print_info
+        in CATEGORY_FILTER_TESTCASES]
+)
+def test_get_domains_from_category_filters(capsys, category_filters,
+                                           expected_output, print_info):
+    """Test filtering domains by category."""
+    parser = DisconnectParser(blocklist="tests/sample_blocklist.json")
+    output = l2s.get_domains_from_category_filters(parser, category_filters)
+    print_output = capsys.readouterr().out
+
+    expected_print_output = (" * filter %s matched %d domains\n"
+                             % (category_filters[0], print_info[0]))
+    for f, p in zip(category_filters[1:], print_info[1:]):
+        expected_print_output += (" * filter %s matched %d domains. "
+                                  "Reduced set to %d items.\n"
+                                  % (f, p[0], p[1]))
+
+    assert output == expected_output
+    assert print_output == expected_print_output
+
+
+def test_get_domains_from_category_filters_invalid_input():
+    """Test invalid input handling in get_domains_from_category_filters."""
+    with pytest.raises(ValueError):
+        l2s.get_domains_from_category_filters(None, "Advertising")
 
 
 def _write_safebrowsing_blocklist(chunknum, version, write_to_file=True):

@@ -1,0 +1,91 @@
+{
+  "license": "",
+  "categories": {
+    "Advertising": [
+      {
+        "AdNetwork.net": {
+          "http://www.adnetwork.net/": [
+            "adnetwork.net"
+          ]
+        }
+      },
+      {
+        "AppCast": {
+          "https://appcast.io/": [
+            "appcast.io"
+          ]
+        }
+      }
+    ],
+    "Content": [
+      {
+        "Vimeo": {
+          "http://vimeo.com/": [
+            "vimeo.com",
+            "vimeocdn.com"
+          ]
+        }
+      }
+    ],
+    "Analytics": [
+      {
+        "ClickGuard": {
+          "https://www.clickguard.com/": [
+            "clickguard.com"
+          ]
+        }
+      },
+      {
+        "Google": {
+          "http://www.google.com/": [
+            "google-analytics.com",
+            "postrank.com"
+          ]
+        }
+      }
+    ],
+    "Fingerprinting": [
+      {
+        "AppCast": {
+          "https://appcast.io/": [
+            "appcast.io"
+          ]
+        }
+      },
+      {
+        "ClickGuard": {
+          "https://www.clickguard.com/": [
+            "clickguard.com"
+          ]
+        }
+      },
+      {
+        "dummytracker": {
+          "https://base-fingerprinting-track-digest256.dummytracker.org/": [
+            "base-fingerprinting-track-digest256.dummytracker.org/tracker.js"
+          ]
+        }
+      }
+    ],
+    "Social": [
+      {
+        "Twitter": {
+          "https://twitter.com/": [
+            "twimg.com",
+            "twitter.com",
+            "twitter.jp"
+          ]
+        }
+      }
+    ],
+    "Cryptomining": [
+      {
+        "Webmining": {
+          "https://webmining.co/": [
+            "webmining.co"
+          ]
+        }
+      }
+    ]
+  }
+}
