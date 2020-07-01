@@ -21,6 +21,7 @@ jobs:
           name: Run unit tests
           command: |
             source ~/venv/bin/activate
+            cp sample_shavar_list_creation.ini shavar_list_creation.ini
             mkdir test-results
             python -m pytest -v --junitxml=test-results/junit.xml
       - store_test_results:
