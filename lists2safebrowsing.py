@@ -202,7 +202,7 @@ def get_domains_from_filters(parser, category_filters,
     ----------
     parser : DisconnectParser
         An instance of the Disconnect list parser
-    category_filters : list of list of strings
+    category_filters : list of lists of strings
         A filter to restrict output to the specified top-level categories.
         Each filter should be a comma-separated list of top-level categories
         to restrict the list to. If more than one filter is provided, the
@@ -211,7 +211,7 @@ def get_domains_from_filters(parser, category_filters,
             `[['Advertising', 'Analytics'], ['Fingerprinting']]` will return
             domains in either the Advertising or Analytics category AND in the
             Fingerprinting category.
-    category_exclusion_filters : list of list of strings, optional
+    category_exclusion_filters : list of lists of strings, optional
         A filter to exclude domains from the specified top-level categories.
         The list format is the same as `category_filters`.
     dnt_filter : string, optional

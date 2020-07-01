@@ -93,7 +93,7 @@ CATEGORY_FILTER_TESTCASES = (
     (
         "union",
         [["Social", "Cryptomining"]],
-        {"twimg.com", "twitter.com", "twitter.jp", "webmining.co"},
+        {"twimg.com", "twitter.com", "twitter.jp", "coinpot.co"},
         (4,)
     ),
     (
@@ -106,7 +106,7 @@ CATEGORY_FILTER_TESTCASES = (
         "union_intersection",
         [["Advertising", "Analytics"], ["Fingerprinting"]],
         {"appcast.io", "clickguard.com"},
-        (5, (3, 2))
+        (6, (3, 2))
     ),
 )
 
@@ -211,6 +211,11 @@ def chunknum():
     return int(time.time())
 
 
+@pytest.fixture
+def parser():
+    return DisconnectParser(blocklist="tests/sample_blocklist.json")
+
+
 def test_canonicalize_return_type():
     """Test that the return type of canonicalize is str."""
     assert type(l2s.canonicalize("https://host.com/path")) is str
@@ -306,34 +311,90 @@ def test_add_domain_to_list_duplicate():
     assert not log_writes
 
 
+def _get_expected_print(category_filters, print_info):
+    """Prepare expected print string for domain filtering tests."""
+    expected_print = (" * filter %s matched %d domains\n"
+                      % (category_filters[0], print_info[0]))
+
+    for f, p in zip(category_filters[1:], print_info[1:]):
+        expected_print += (" * filter %s matched %d domains. Reduced "
+                           "set to %d items.\n" % (f, p[0], p[1]))
+
+    return expected_print
+
+
 @pytest.mark.parametrize(
     "category_filters,expected_output,print_info",
     [pytest.param(category_filters, expected_output, print_info, id=id)
         for id, category_filters, expected_output, print_info
         in CATEGORY_FILTER_TESTCASES]
 )
-def test_get_domains_from_category_filters(capsys, category_filters,
+def test_get_domains_from_category_filters(capsys, parser, category_filters,
                                            expected_output, print_info):
     """Test filtering domains by category."""
-    parser = DisconnectParser(blocklist="tests/sample_blocklist.json")
     output = l2s.get_domains_from_category_filters(parser, category_filters)
-    print_output = capsys.readouterr().out
 
-    expected_print_output = (" * filter %s matched %d domains\n"
-                             % (category_filters[0], print_info[0]))
-    for f, p in zip(category_filters[1:], print_info[1:]):
-        expected_print_output += (" * filter %s matched %d domains. "
-                                  "Reduced set to %d items.\n"
-                                  % (f, p[0], p[1]))
+    expected_print = _get_expected_print(category_filters, print_info)
 
     assert output == expected_output
-    assert print_output == expected_print_output
+    assert capsys.readouterr().out == expected_print
 
 
 def test_get_domains_from_category_filters_invalid_input():
     """Test invalid input handling in get_domains_from_category_filters."""
     with pytest.raises(ValueError):
         l2s.get_domains_from_category_filters(None, "Advertising")
+
+
+def test_get_domains_from_filters(capsys, parser):
+    """Validate domain filtering."""
+    category_filters = [["Analytics"]]
+
+    output = l2s.get_domains_from_filters(parser, category_filters)
+
+    expected_output = {"clickguard.com", "google-analytics.com",
+                       "postrank.com"}
+    expected_print = _get_expected_print(category_filters, (4,))
+    expected_print += " * removing 1 rule(s) due to DNT exceptions\n"
+
+    assert output == expected_output
+    assert capsys.readouterr().out == expected_print
+
+
+def test_get_domains_from_filters_category_exclusion(capsys, parser):
+    """Validate domain filtering with category exclusion filters."""
+    category_filters = [["Advertising"]]
+    category_exclusion_filters = [["Fingerprinting"]]
+
+    output = l2s.get_domains_from_filters(parser, category_filters,
+                                          category_exclusion_filters)
+
+    expected_output = {"adnetwork.net"}
+    expected_print = _get_expected_print(category_filters, (2,))
+    expected_print += _get_expected_print(category_exclusion_filters, (3,))
+    expected_print += " * exclusion filters removed 1 domains from output\n"
+    expected_print += " * removing 1 rule(s) due to DNT exceptions\n"
+
+    assert output == expected_output
+    assert capsys.readouterr().out == expected_print
+
+
+def test_get_domains_from_filters_tags(capsys, parser):
+    """Validate domain filtering with tag filters."""
+    category_filters = [["Social", "Cryptomining"]]
+    tag_filters = "performance"
+
+    output = l2s.get_domains_from_filters(parser, category_filters,
+                                          tag_filters=tag_filters)
+
+    expected_output = {"coinpot.co"}
+    expected_print = _get_expected_print(category_filters, (4,))
+    expected_print += " * removing 1 rule(s) due to DNT exceptions\n"
+    expected_print += (" * found 1 rule(s) with filter %s. Filtered "
+                       "output to 1.\n" % tag_filters)
+
+    assert output == expected_output
+    assert capsys.readouterr().out == expected_print
 
 
 def _write_safebrowsing_blocklist(chunknum, version, write_to_file=True):

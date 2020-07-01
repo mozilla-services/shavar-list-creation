@@ -42,6 +42,14 @@
             "postrank.com"
           ]
         }
+      },
+      {
+        "ItIsATracker": {
+          "https://itisatracker.com/": [
+            "itisatracker.com"
+          ],
+          "dnt": "eff"
+        }
       }
     ],
     "Fingerprinting": [
@@ -80,10 +88,11 @@
     ],
     "Cryptomining": [
       {
-        "Webmining": {
-          "https://webmining.co/": [
-            "webmining.co"
-          ]
+        "CoinPot": {
+          "http://coinpot.co": [
+            "coinpot.co"
+          ],
+          "performance": "true"
         }
       }
     ]
