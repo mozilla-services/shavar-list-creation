@@ -1,21 +1,27 @@
 version: 2.1
-
-orbs:
-  python: circleci/python@0.2.1
-
 jobs:
-  build-and-test:
-    executor: python/default
+  build:
+    docker:
+      - image: circleci/python:2.7
     steps:
       - checkout
-      - python/load-cache
-      - python/install-deps
-      - python/save-cache
+      - restore_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
       - run:
-          command: ./manage.py test
-          name: Test
-
-workflows:
-  main:
-    jobs:
-      - build-and-test
+          name: Install dependencies in virtual environment
+          command: |
+            virtualenv ~/venv
+            source ~/venv/bin/activate
+            pip install -r requirements.txt
+      - save_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
+          paths:
+            - "~/venv"
+      - run:
+          name: Run unit tests
+          command: |
+            source ~/venv/bin/activate
+            mkdir test-results
+            python -m pytest -v --junitxml=test-results/junit.xml
+      - store_test_results:
+              path: test-results
