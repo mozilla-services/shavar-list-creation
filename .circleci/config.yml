@@ -23,6 +23,9 @@ jobs:
             source ~/venv/bin/activate
             cp sample_shavar_list_creation.ini shavar_list_creation.ini
             mkdir test-results
-            python -m pytest -v --junitxml=test-results/junit.xml
+            python -m pytest -v --junitxml=test-results/junit.xml --cov=. --cov-report=xml --cov-branch
+      - run:
+          name: Upload coverage report to Codecov
+          command: bash <(curl -s https://codecov.io/bash)
       - store_test_results:
               path: test-results

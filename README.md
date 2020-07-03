@@ -31,7 +31,7 @@ generates safebrowsing-compatible digest list files to be served by
 3. Run the unit tests (currently under development):
 
     ```
-    python -m pytest -v
+    python -m pytest -v --cov=. --cov-branch
     ```
 
 4. Copy the `sample_shavar_list_creation.ini` file to
