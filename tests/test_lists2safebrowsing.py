@@ -1,6 +1,9 @@
-import pytest
+import hashlib
 
-from lists2safebrowsing import canonicalize
+import pytest
+from mock import call, patch, mock_open
+
+from lists2safebrowsing import canonicalize, add_domain_to_list
 
 
 CANONICALIZE_TESTCASES = (
@@ -97,3 +100,71 @@ def test_canonicalize(url, expected):
     documentation with some adjustments and additions.
     """
     assert canonicalize(url) == expected
+
+
+def _add_domain_to_list(domain, previous_domains, output):
+    """Auxiliary function for add_domain_to_list tests."""
+    canonicalized_domain = canonicalize(domain)
+    domain_hash = hashlib.sha256(canonicalized_domain.encode("utf-8"))
+
+    with patch("test_lists2safebrowsing.open", mock_open()):
+        with open("test_blocklist.log", "w") as log_file:
+            added = add_domain_to_list(domain, previous_domains,
+                                       log_file, output)
+            log_writes = log_file.write.call_args_list
+
+    return (added, canonicalized_domain, domain_hash, previous_domains,
+            log_writes, output)
+
+
+def test_add_domain_to_list():
+    """Test adding a domain to a blocklist."""
+    domain = "https://www.host.com"
+    (added, canonicalized_domain, domain_hash, previous_domains,
+     log_writes, output) = _add_domain_to_list(domain, set(), [])
+
+    expected_log_writes = [
+        call("[m] %s >> %s\n" % (domain, canonicalized_domain)),
+        call("[canonicalized] %s\n" % canonicalized_domain),
+        call("[hash] %s\n" % domain_hash.hexdigest()),
+    ]
+
+    assert added
+    assert canonicalized_domain in previous_domains
+    assert domain_hash.digest() in output
+    assert log_writes == expected_log_writes
+
+
+def test_add_domain_to_list_psl_public():
+    """Test handling of ICANN public suffix list domains.
+
+    add_domain_to_list raises a ValueError
+    """
+    with pytest.raises(ValueError):
+        _add_domain_to_list("https://co.uk", set(), [])
+
+
+def test_add_domain_to_list_psl_private():
+    """Test handling of private public suffix list domains.
+
+    add_domain_to_list adds them to the blocklist
+    """
+    assert _add_domain_to_list("https://apps.fbsbx.com", set(), [])[0]
+
+
+def test_add_domain_to_list_duplicate():
+    """Test that add_domain_to_list does not add domains twice."""
+    domain = "https://duplicate.com"
+    (added, canonicalized_domain, domain_hash, previous_domains, _,
+     output) = _add_domain_to_list(domain, set(), [])
+
+    assert added
+    assert canonicalized_domain in previous_domains
+    assert domain_hash.digest() in output
+
+    added, _, _, _, log_writes, output = _add_domain_to_list(
+        domain, previous_domains, output)
+
+    assert not added
+    assert output == [domain_hash.digest()]
+    assert not log_writes

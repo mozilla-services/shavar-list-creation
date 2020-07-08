@@ -36,7 +36,7 @@ from publish2cloud import (
 )
 
 updatePSL()
-psl = PublicSuffixList()
+psl = PublicSuffixList(only_icann=True)
 
 GITHUB_API_URL = 'https://api.github.com'
 SHAVAR_PROD_LISTS_BRANCHES_PATH = (
@@ -149,19 +149,21 @@ def canonicalize(d):
     return _url
 
 
-def add_domain_to_list(domain, previous_domains, allow_list, log_file, output):
+def add_domain_to_list(domain, previous_domains, log_file, output):
     """Prepare domain to be added to output list.
 
     Returns `True` if a domain was added, `False` otherwise"""
     canon_d = canonicalize(domain)
-    if (canon_d not in previous_domains) and (domain not in allow_list):
-        # check if the domain is in the public suffix list
-        # SafeBrowsing keeps trailing '/', PublicSuffix does not
-        psl_d = canon_d.rstrip('/')
-        if psl.publicsuffix(psl_d) == psl_d:
-            if log_file:
-                log_file.write("[Public Suffix] %s; Skipping.\n" % psl_d)
-            return False
+    if canon_d in previous_domains:
+        return False
+    # Check if the domain is in the public (ICANN) section of the Public
+    # Suffix List. See:
+    # https://github.com/mozilla-services/shavar-list-creation/issues/102
+    # SafeBrowsing keeps trailing '/', PublicSuffix does not
+    psl_d = canon_d.rstrip('/')
+    if psl.publicsuffix(psl_d) == psl_d:
+        raise ValueError("Domain '%s' is in the public section of the "
+                         "Public Suffix List" % psl_d)
     if log_file:
         log_file.write("[m] %s >> %s\n" % (domain, canon_d))
         log_file.write("[canonicalized] %s\n" % (canon_d))
@@ -262,13 +264,12 @@ def get_domains_from_filters(parser, category_filters,
     return output
 
 
-def write_safebrowsing_blocklist(domains, output_name, allow_list, log_file,
-                                 chunk, output_file, name, version):
+def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
+                                 output_file, name, version):
     """Generates safebrowsing-compatible blocklist from a set of `domains`.
 
     Args:
-      domains: a list of hostnames and/or hostname+paths to add to blocklist
-      allow_list: Hosts that we can't put on the blocklist.
+      domains: a set of hostnames and/or hostname+paths to add to blocklist
       chunk: The chunk number to use.
       output_file: A file-handle to the output file.
       log_file: A filehandle to the log file.
@@ -291,16 +292,14 @@ def write_safebrowsing_blocklist(domains, output_name, allow_list, log_file,
     # Add a static test domain to list
     test_domain = TEST_DOMAIN_TEMPLATE % output_name
     num_test_domain_added = 0
-    added = add_domain_to_list(
-        test_domain, previous_domains, allow_list, log_file, output
-    )
+    added = add_domain_to_list(test_domain, previous_domains, log_file, output)
     if added:
         num_test_domain_added += 1
 
     if version:
         test_domain = '{0}-{1}'.format(version.replace('.', '-'), test_domain)
         added = add_domain_to_list(
-            test_domain, previous_domains, allow_list, log_file, output
+            test_domain, previous_domains, log_file, output
         )
         if added:
             num_test_domain_added += 1
@@ -311,9 +310,7 @@ def write_safebrowsing_blocklist(domains, output_name, allow_list, log_file,
         publishing += num_test_domain_added
 
     for d in domains:
-        added = add_domain_to_list(
-            d, previous_domains, allow_list, log_file, output
-        )
+        added = add_domain_to_list(d, previous_domains, log_file, output)
         if added:
             # TODO?: hashdata_bytes += hashdata.digest_size
             hashdata_bytes += 32
@@ -406,21 +403,6 @@ def get_tracker_lists(config, section, chunknum):
     blocklist_url = get_list_url(config, section, "disconnect_url")
     parser = DisconnectParser(blocklist_url=blocklist_url)
 
-    # load our allowlist
-    allowed = set()
-    try:
-        allowlist_url = config.get(section, "allowlist_url")
-    except Exception:
-        allowlist_url = None
-    # TODO: refactor into: def get_allowed_domains(allowlist_url)
-    if allowlist_url:
-        for line in urllib2.urlopen(allowlist_url).readlines():
-            line = line.strip()
-            # don't add blank lines or comments
-            if not line or line.startswith('#'):
-                continue
-            allowed.add(line)
-
     # category filter
     if config.has_option(section, "categories"):
         list_categories = config.get(section, "categories").split(',')
@@ -471,8 +453,8 @@ def get_tracker_lists(config, section, chunknum):
     version = (config.has_option(section, "version")
                and config.get(section, "version"))
     write_safebrowsing_blocklist(
-        blocked_domains, output_filename, allowed, log_file,
-        chunknum, output_file, section, version
+        blocked_domains, output_filename, log_file, chunknum,
+        output_file, section, version
     )
     return output_file, log_file
 
