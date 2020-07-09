@@ -94,6 +94,13 @@
           ],
           "performance": "true"
         }
+      },
+      {
+        "Webmining": {
+          "https://webmining.co/": [
+            "webmining.co"
+          ]
+        }
       }
     ]
   }
