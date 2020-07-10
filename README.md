@@ -2,6 +2,7 @@ shavar-list-creation
 ====================
 
 [![Build Status](https://circleci.com/gh/mozilla-services/shavar-list-creation.svg?style=shield)](https://circleci.com/gh/mozilla-services/shavar-list-creation)
+[![Coverage](https://circleci.com/api/v1.1/project/github/mozilla-services/shavar-list-creation/latest/artifacts/0/coverage.svg?branch=main)](https://circleci.com/api/v1.1/project/github/mozilla-services/shavar-list-creation/latest/artifacts/0/htmlcov/index.html?branch=main)
 
 This script fetches blocklist `.json` from urls (such as
 [shavar-prod-lists](https://github.com/mozilla-services/shavar-prod-lists)) and
