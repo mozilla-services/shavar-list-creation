@@ -24,7 +24,8 @@ jobs:
             source ~/venv/bin/activate
             cp sample_shavar_list_creation.ini shavar_list_creation.ini
             mkdir test-results
-            python -m pytest -v --junitxml=test-results/junit.xml --cov=. --cov-report=html --cov-branch
+            python -m pytest -v --junitxml=test-results/junit.xml --cov=. \
+            --cov-report=term --cov-report=html --cov-branch
             coverage-badge -o coverage.svg
       - store_test_results:
               path: test-results
