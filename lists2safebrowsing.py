@@ -475,7 +475,9 @@ def get_entity_lists(config, section, chunknum):
     output_file, log_file = get_output_and_log_files(config, section)
 
     # download and load the business entity oriented whitelist
-    whitelist = load_json_from_url(config, section, "entity_url")
+    whitelist = load_json_from_url(
+        config, section, "entity_url"
+    ).pop('entities')
 
     if channel_needs_separation and list_needs_separation:
         google_entitylist = {}
