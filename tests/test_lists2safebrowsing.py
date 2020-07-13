@@ -16,6 +16,18 @@ from constants import (
 )
 
 
+GET_LIST_URL_TESTCASES = (
+    ("blocklist", "social-tracking-protection", "disconnect_url",
+        "https://raw.githubusercontent.com/mozilla-services/shavar-prod"
+        "-lists/master/social-tracking-protection-blacklist.json"),
+    ("entity", "entity-whitelist", "entity_url",
+        "https://raw.githubusercontent.com/mozilla-services/shavar-prod"
+        "-lists/master/disconnect-entitylist.json"),
+    ("default", "tracking-protection", "disconnect_url",
+        "https://raw.githubusercontent.com/mozilla-services/shavar-prod"
+        "-lists/master/disconnect-blacklist.json"),
+)
+
 CANONICALIZE_TESTCASES = (
     ("dummy_tracking_domain", "https://base-fingerprinting-track-digest256."
         "dummytracker.org/tracker.js", "base-fingerprinting-track-digest256."
@@ -267,6 +279,16 @@ def test_get_output_and_log_files_no_filename(config):
 
     assert output_file is None
     assert log_file is None
+
+
+@pytest.mark.parametrize(
+    "section,key,expected_url",
+    [pytest.param(section, key, expected_url, id=id)
+        for id, section, key, expected_url in GET_LIST_URL_TESTCASES]
+)
+def test_get_list_url(config, section, key, expected_url):
+    """Validate getting list URL from configuration file."""
+    assert l2s.get_list_url(config, section, key) == expected_url
 
 
 def test_canonicalize_return_type():
