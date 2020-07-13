@@ -291,6 +291,39 @@ def test_get_list_url(config, section, key, expected_url):
     assert l2s.get_list_url(config, section, key) == expected_url
 
 
+def test_load_json_from_url(config):
+    """Test loading the JSON entity list from a URL."""
+    data = json.dumps(TEST_ENTITY_DICT)
+    with patch("lists2safebrowsing.urllib2.urlopen",
+               mock_open(read_data=data)) as mocked_open:
+        loaded_json = l2s.load_json_from_url(config, "entity-whitelist",
+                                             "entity_url")
+
+    urlopen_calls = mocked_open.call_args_list
+    expected_urlopen_calls = [call(ENTITY_LIST_URL)]
+    name, entity = sorted(loaded_json["entities"].items())[0]
+
+    assert urlopen_calls == expected_urlopen_calls
+    assert name == "Google"
+    assert entity["properties"] == ["blogspot.com", "youtube.com"]
+    assert entity["resources"] == ["gmail.com", "google-analytics.com"]
+
+
+def test_load_json_from_url_exception(capsys, config):
+    """Test load_json_from_url when opening the URL fails."""
+    error = Exception
+    with patch("lists2safebrowsing.urllib2.urlopen", side_effect=error):
+        with pytest.raises(SystemExit) as e:
+            l2s.load_json_from_url(config, "entity-whitelist", "entity_url")
+
+    expected_error_msg = (
+        "Error loading %s: %s\n" % (ENTITY_LIST_URL, repr(error()))
+    )
+
+    assert e.value.code == -1
+    assert capsys.readouterr().err == expected_error_msg
+
+
 def test_canonicalize_return_type():
     """Test that the return type of canonicalize is str."""
     assert type(l2s.canonicalize("https://host.com/path")) is str

@@ -67,8 +67,8 @@ def load_json_from_url(config, section, key):
     url = get_list_url(config, section, key)
     try:
         loaded_json = json.loads(urllib2.urlopen(url).read())
-    except Exception:
-        sys.stderr.write("Error loading %s\n" % url)
+    except Exception as e:
+        sys.stderr.write("Error loading %s: %s\n" % (url, repr(e)))
         sys.exit(-1)
     return loaded_json
 
