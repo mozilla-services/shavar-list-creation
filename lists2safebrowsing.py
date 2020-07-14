@@ -29,7 +29,7 @@ from constants import (
     STANDARD_ENTITY_SECTION,
     TEST_DOMAIN_TEMPLATE,
     VERS_LARGE_ENTITIES_SEPARATION_STARTED,
-    WHITELIST_SECTIONS,
+    ENTITYLIST_SECTIONS,
 )
 from publish2cloud import (
     publish_to_cloud
@@ -513,7 +513,7 @@ def version_configurations(config, section, version, revert=False):
         source_url = 'disconnect_url'
         versioned_key = 'tracking/{ver}/'.format(ver=version)
 
-    if section in WHITELIST_SECTIONS:
+    if section in ENTITYLIST_SECTIONS:
         initial_s3_key_value = 'entity/'
         source_url = 'entity_url'
         versioned_key = 'entity/{ver}/'.format(ver=version)
@@ -583,7 +583,7 @@ def get_versioned_lists(config, chunknum, version):
             output_file, log_file = get_tracker_lists(
                 config, section, chunknum)
 
-        if section in WHITELIST_SECTIONS:
+        if section in ENTITYLIST_SECTIONS:
             ver = p_version.parse(version)
             skip_large_entity_separation = (
                 ver.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
@@ -651,7 +651,7 @@ def main():
             process_plugin_blocklist(blocked, chunknum, output_file, log_file,
                                      section)
 
-        if section in WHITELIST_SECTIONS:
+        if section in ENTITYLIST_SECTIONS:
             output_file, log_file = get_entity_lists(config, section, chunknum)
 
     if output_file:
