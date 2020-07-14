@@ -327,7 +327,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     return
 
 
-def process_entity_whitelist(incoming, chunk, output_file,
+def process_entitylist(incoming, chunk, output_file,
                              log_file, list_variant):
     """
     Expects a dict from a loaded JSON blob.
@@ -474,21 +474,21 @@ def get_entity_lists(config, section, chunknum):
     )
     output_file, log_file = get_output_and_log_files(config, section)
 
-    # download and load the business entity oriented whitelist
-    whitelist = load_json_from_url(
+    # download and load the business entity oriented list
+    entitylist = load_json_from_url(
         config, section, "entity_url"
     ).pop('entities')
 
     if channel_needs_separation and list_needs_separation:
         google_entitylist = {}
-        google_entitylist['Google'] = whitelist.pop('Google')
+        google_entitylist['Google'] = entitylist.pop('Google')
 
     if section in LARGE_ENTITIES_SECTIONS:
-        process_entity_whitelist(google_entitylist, chunknum,
-                                 output_file, log_file, section)
+        process_entitylist(google_entitylist, chunknum,
+                           output_file, log_file, section)
     else:
-        process_entity_whitelist(whitelist, chunknum, output_file,
-                                 log_file, section)
+        process_entitylist(entitylist, chunknum, output_file,
+                           log_file, section)
     return output_file, log_file
 
 
