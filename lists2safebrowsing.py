@@ -327,8 +327,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     return
 
 
-def process_entitylist(incoming, chunk, output_file,
-                             log_file, list_variant):
+def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
     """
     Expects a dict from a loaded JSON blob.
     """
@@ -364,7 +363,7 @@ def process_entitylist(incoming, chunk, output_file,
 
     output_file.flush()
     output_size = os.fstat(output_file.fileno()).st_size
-    print("Entity whitelist(%s): publishing %d items; file size %d" % (
+    print("Entity list(%s): publishing %d items; file size %d" % (
         list_variant, publishing, output_size))
 
 
