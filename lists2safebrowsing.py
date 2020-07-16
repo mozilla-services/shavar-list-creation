@@ -363,8 +363,8 @@ def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
 
     output_file.flush()
     output_size = os.fstat(output_file.fileno()).st_size
-    print("Entity list(%s): publishing %d items; file size %d" % (
-        list_variant, publishing, output_size))
+    print("Entity list(%s): publishing %d items; file size %d" 
+          % (list_variant, publishing, output_size))
 
 
 def process_plugin_blocklist(incoming, chunk, output_file, log_file,
