@@ -1,4 +1,6 @@
+import ConfigParser
 import hashlib
+import json
 import time
 
 import pytest
@@ -8,6 +10,7 @@ import lists2safebrowsing as l2s
 from constants import (
     LIST_TYPE_ENTITY,
     LIST_TYPE_PLUGIN,
+    STANDARD_ENTITY_SECTION,
 )
 
 
@@ -157,6 +160,15 @@ PROCESS_PLUGIN_BLOCKLIST_EXPECTED_LOG_WRITE_INFO = (
     (CANONICALIZE_TESTCASES[1][1], CANONICALIZE_TESTCASES[1][2],
         "bc9a8f2b6fffd58571e188bb110545f8fb3af51cdf1a63696d505a9870a85be5"),
 )
+
+GET_ENTITY_LISTS_TESTCASES = (
+    ("separation_standard", STANDARD_ENTITY_SECTION, None),
+    ("separation_google", "google-whitelist", None),
+    ("no_separation", STANDARD_ENTITY_SECTION, "72.0"),
+)
+
+ENTITY_LIST_URL = ("https://raw.githubusercontent.com/mozilla-services/"
+                   "shavar-prod-lists/master/disconnect-entitylist.json")
 
 TEST_SECTION = "tracking-protection-test"
 
@@ -373,3 +385,50 @@ def test_process_list(capsys, chunknum, log, list_type):
     assert output_writes == expected_output_writes
     assert log_writes == expected_log_writes
     assert capsys.readouterr().out == expected_print
+
+
+@pytest.mark.parametrize(
+    "section,version,testcase",
+    [pytest.param(section, version, id, id=id)
+        for id, section, version in GET_ENTITY_LISTS_TESTCASES]
+)
+def test_get_entity_lists(chunknum, section, version, testcase):
+    """Validate creating an entity list from a configuration section."""
+    config = ConfigParser.ConfigParser()
+    config.readfp(open("sample_shavar_list_creation.ini"))
+
+    if version:
+        config.set(section, "version", version)
+
+    data = json.dumps(TEST_ENTITY_DICT)
+    with patch("lists2safebrowsing.urllib2.urlopen",
+               mock_open(read_data=data)) as mocked_urlopen, \
+            patch("lists2safebrowsing.open", mock_open()) as mocked_open:
+        output_file, _ = l2s.get_entity_lists(config, section, chunknum)
+
+    urlopen_calls = mocked_urlopen.call_args_list
+    expected_urlopen_calls = [call(ENTITY_LIST_URL)]
+    open_calls = mocked_open.call_args_list
+    output_filename = config.get(section, "output")
+    expected_open_calls = [call(output_filename, "wb"),
+                           call(output_filename + ".log", "w")]
+
+    expected_hashes = PROCESS_ENTITYLIST_EXPECTED_OUTPUT_WRITES[1]
+    if testcase == "separation_standard":
+        expected_hashes = expected_hashes[4:]
+    elif testcase == "separation_google":
+        expected_hashes = expected_hashes[:4]
+
+    domains_number = len(expected_hashes)
+
+    expected_output_writes = (
+        [call(b"a:%d:32:%d\n" % (chunknum, domains_number * 32))]
+        + [call(h) for h in expected_hashes]
+    )
+
+    # Exclude log writes
+    output_writes = output_file.write.call_args_list[domains_number:]
+
+    assert urlopen_calls == expected_urlopen_calls
+    assert open_calls == expected_open_calls
+    assert output_writes == expected_output_writes
