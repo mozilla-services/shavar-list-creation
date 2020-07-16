@@ -496,13 +496,17 @@ def get_plugin_lists(config, section, chunknum):
     # load the plugin blocklist
     blocked = set()
     blocklist_url = config.get(section, "blocklist")
-    if blocklist_url:
-        for line in urllib2.urlopen(blocklist_url).readlines():
-            line = line.strip()
-            # don't add blank lines or comments
-            if not line or line.startswith('#'):
-                continue
-            blocked.add(line)
+    if not blocklist_url:
+        raise ValueError("The 'blocklist' key in section '%s' of the "
+                         "configuration file is empty. A plugin "
+                         "blocklist URL must be specified." % section)
+
+    for line in urllib2.urlopen(blocklist_url).readlines():
+        line = line.strip()
+        # don't add blank lines or comments
+        if not line or line.startswith('#'):
+            continue
+        blocked.add(line)
 
     output_file, log_file = get_output_and_log_files(config, section)
     process_plugin_blocklist(blocked, chunknum, output_file, log_file,
