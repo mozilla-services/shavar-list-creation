@@ -169,6 +169,8 @@ GET_ENTITY_LISTS_TESTCASES = (
 
 ENTITY_LIST_URL = ("https://raw.githubusercontent.com/mozilla-services/"
                    "shavar-prod-lists/master/disconnect-entitylist.json")
+PLUGIN_LIST_URL = ("https://raw.githubusercontent.com/mozilla-services/"
+                   "shavar-plugin-blocklist/master/mozplugin-block.txt")
 
 TEST_SECTION = "tracking-protection-test"
 
@@ -387,13 +389,29 @@ def test_process_list(capsys, chunknum, log, list_type):
     assert capsys.readouterr().out == expected_print
 
 
+def _get_entity_or_plugin_lists(chunknum, config, function, section, data):
+    """Auxiliary function for get_entity_lists/get_plugin_lists tests."""
+    with patch("lists2safebrowsing.urllib2.urlopen",
+               mock_open(read_data=data)) as mocked_urlopen, \
+            patch("lists2safebrowsing.open", mock_open()) as mocked_open:
+        output_file, _ = function(config, section, chunknum)
+
+    urlopen_calls = mocked_urlopen.call_args_list
+    open_calls = mocked_open.call_args_list
+    output_writes = output_file.write.call_args_list
+    # Exclude log writes
+    output_writes = output_writes[len(output_writes) // 2:]
+
+    return urlopen_calls, open_calls, output_writes
+
+
 @pytest.mark.parametrize(
     "section,version,testcase",
     [pytest.param(section, version, id, id=id)
         for id, section, version in GET_ENTITY_LISTS_TESTCASES]
 )
 def test_get_entity_lists(chunknum, section, version, testcase):
-    """Validate creating an entity list from a configuration section."""
+    """Test creating an entity list from a configuration section."""
     config = ConfigParser.ConfigParser()
     config.readfp(open("sample_shavar_list_creation.ini"))
 
@@ -401,14 +419,11 @@ def test_get_entity_lists(chunknum, section, version, testcase):
         config.set(section, "version", version)
 
     data = json.dumps(TEST_ENTITY_DICT)
-    with patch("lists2safebrowsing.urllib2.urlopen",
-               mock_open(read_data=data)) as mocked_urlopen, \
-            patch("lists2safebrowsing.open", mock_open()) as mocked_open:
-        output_file, _ = l2s.get_entity_lists(config, section, chunknum)
 
-    urlopen_calls = mocked_urlopen.call_args_list
+    urlopen_calls, open_calls, output_writes = _get_entity_or_plugin_lists(
+        chunknum, config, l2s.get_entity_lists, section, data)
+
     expected_urlopen_calls = [call(ENTITY_LIST_URL)]
-    open_calls = mocked_open.call_args_list
     output_filename = config.get(section, "output")
     expected_open_calls = [call(output_filename, "wb"),
                            call(output_filename + ".log", "w")]
@@ -418,17 +433,54 @@ def test_get_entity_lists(chunknum, section, version, testcase):
         expected_hashes = expected_hashes[4:]
     elif testcase == "separation_google":
         expected_hashes = expected_hashes[:4]
-
-    domains_number = len(expected_hashes)
-
     expected_output_writes = (
-        [call(b"a:%d:32:%d\n" % (chunknum, domains_number * 32))]
+        [call(b"a:%d:32:%d\n" % (chunknum, len(expected_hashes) * 32))]
         + [call(h) for h in expected_hashes]
     )
-
-    # Exclude log writes
-    output_writes = output_file.write.call_args_list[domains_number:]
 
     assert urlopen_calls == expected_urlopen_calls
     assert open_calls == expected_open_calls
     assert output_writes == expected_output_writes
+
+
+def test_get_plugin_lists(chunknum):
+    """Test creating a plugin blocklist from a configuration section."""
+    config = ConfigParser.ConfigParser()
+    config.readfp(open("sample_shavar_list_creation.ini"))
+    section = "plugin-blocklist"
+
+    domains = [d[1] for d in CANONICALIZE_TESTCASES[:2]]
+    # Add a comment line and a line with whitespace
+    data = "\n".join(["# Comment", "    "] + domains)
+
+    urlopen_calls, open_calls, output_writes = _get_entity_or_plugin_lists(
+        chunknum, config, l2s.get_plugin_lists, section, data)
+
+    expected_urlopen_calls = [call(PLUGIN_LIST_URL)]
+    output_filename = config.get(section, "output")
+    expected_open_calls = [call(output_filename, "wb"),
+                           call(output_filename + ".log", "w")]
+
+    expected_hashes = PROCESS_PLUGIN_BLOCKLIST_EXPECTED_OUTPUT_WRITES[1]
+    # FIXME: Reversing the list of hashes will not be needed when
+    # alphanumerical ordering is enforced
+    expected_output_writes = (
+        [call(b"a:%d:32:%d\n" % (chunknum, len(expected_hashes) * 32))]
+        + [call(h) for h in reversed(expected_hashes)]
+    )
+
+    assert urlopen_calls == expected_urlopen_calls
+    assert open_calls == expected_open_calls
+    assert output_writes == expected_output_writes
+
+
+def test_get_plugin_lists_empty_url(chunknum):
+    """Test empty blocklist URL handling in get_plugin_lists."""
+    config = ConfigParser.ConfigParser()
+    config.readfp(open("sample_shavar_list_creation.ini"))
+    section = "plugin-blocklist"
+
+    config.set(section, "blocklist", "")
+
+    with pytest.raises(ValueError):
+        l2s.get_plugin_lists(config, section, chunknum)
