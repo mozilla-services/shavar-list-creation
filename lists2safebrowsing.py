@@ -29,7 +29,7 @@ from constants import (
     STANDARD_ENTITY_SECTION,
     TEST_DOMAIN_TEMPLATE,
     VERS_LARGE_ENTITIES_SEPARATION_STARTED,
-    WHITELIST_SECTIONS,
+    ENTITYLIST_SECTIONS,
 )
 from publish2cloud import (
     publish_to_cloud
@@ -327,8 +327,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     return
 
 
-def process_entity_whitelist(incoming, chunk, output_file,
-                             log_file, list_variant):
+def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
     """
     Expects a dict from a loaded JSON blob.
     """
@@ -364,8 +363,8 @@ def process_entity_whitelist(incoming, chunk, output_file,
 
     output_file.flush()
     output_size = os.fstat(output_file.fileno()).st_size
-    print("Entity whitelist(%s): publishing %d items; file size %d" % (
-        list_variant, publishing, output_size))
+    print("Entity list(%s): publishing %d items; file size %d" 
+          % (list_variant, publishing, output_size))
 
 
 def process_plugin_blocklist(incoming, chunk, output_file, log_file,
@@ -474,19 +473,21 @@ def get_entity_lists(config, section, chunknum):
     )
     output_file, log_file = get_output_and_log_files(config, section)
 
-    # download and load the business entity oriented whitelist
-    whitelist = load_json_from_url(config, section, "entity_url")
+    # download and load the business entity oriented list
+    entitylist = load_json_from_url(
+        config, section, "entity_url"
+    ).pop('entities')
 
     if channel_needs_separation and list_needs_separation:
         google_entitylist = {}
-        google_entitylist['Google'] = whitelist.pop('Google')
+        google_entitylist['Google'] = entitylist.pop('Google')
 
     if section in LARGE_ENTITIES_SECTIONS:
-        process_entity_whitelist(google_entitylist, chunknum,
-                                 output_file, log_file, section)
+        process_entitylist(google_entitylist, chunknum,
+                           output_file, log_file, section)
     else:
-        process_entity_whitelist(whitelist, chunknum, output_file,
-                                 log_file, section)
+        process_entitylist(entitylist, chunknum, output_file,
+                           log_file, section)
     return output_file, log_file
 
 
@@ -511,7 +512,7 @@ def version_configurations(config, section, version, revert=False):
         source_url = 'disconnect_url'
         versioned_key = 'tracking/{ver}/'.format(ver=version)
 
-    if section in WHITELIST_SECTIONS:
+    if section in ENTITYLIST_SECTIONS:
         initial_s3_key_value = 'entity/'
         source_url = 'entity_url'
         versioned_key = 'entity/{ver}/'.format(ver=version)
@@ -581,7 +582,7 @@ def get_versioned_lists(config, chunknum, version):
             output_file, log_file = get_tracker_lists(
                 config, section, chunknum)
 
-        if section in WHITELIST_SECTIONS:
+        if section in ENTITYLIST_SECTIONS:
             ver = p_version.parse(version)
             skip_large_entity_separation = (
                 ver.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
@@ -649,7 +650,7 @@ def main():
             process_plugin_blocklist(blocked, chunknum, output_file, log_file,
                                      section)
 
-        if section in WHITELIST_SECTIONS:
+        if section in ENTITYLIST_SECTIONS:
             output_file, log_file = get_entity_lists(config, section, chunknum)
 
     if output_file:

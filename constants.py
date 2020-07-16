@@ -9,7 +9,7 @@ PLUGIN_SECTIONS = (
     "flash-subdoc-exceptions",
     "flashinfobar-exceptions"
 )
-WHITELIST_SECTIONS = (
+ENTITYLIST_SECTIONS = (
     "entity-whitelist",
     "entity-whitelist-testing",
     "staging-entity-whitelist",
