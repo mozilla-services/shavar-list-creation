@@ -18,7 +18,7 @@ from constants import (
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
     LARGE_ENTITIES_SECTIONS,
-    WHITELIST_SECTIONS,
+    ENTITYLIST_SECTIONS,
 )
 from packaging import version as p_version
 
@@ -240,7 +240,7 @@ def publish_to_remote_settings(config, section):
                 excluded_categories.extend(x.split('|'))
     elif (section in PLUGIN_SECTIONS):
         list_type = LIST_TYPE_PLUGIN
-    elif (section in WHITELIST_SECTIONS):
+    elif (section in ENTITYLIST_SECTIONS):
         list_type = LIST_TYPE_ENTITY
 
     list_name = config.get(section, 'output')

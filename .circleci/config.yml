@@ -13,6 +13,7 @@ jobs:
             virtualenv ~/venv
             source ~/venv/bin/activate
             pip install -r requirements.txt
+            pip install coverage-badge
       - save_cache:
           key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
           paths:
@@ -23,6 +24,12 @@ jobs:
             source ~/venv/bin/activate
             cp sample_shavar_list_creation.ini shavar_list_creation.ini
             mkdir test-results
-            python -m pytest -v --junitxml=test-results/junit.xml
+            python -m pytest -v --junitxml=test-results/junit.xml --cov=. \
+            --cov-report=term --cov-report=html --cov-branch
+            coverage-badge -o coverage.svg
       - store_test_results:
               path: test-results
+      - store_artifacts:
+              path: htmlcov
+      - store_artifacts:
+              path: coverage.svg
