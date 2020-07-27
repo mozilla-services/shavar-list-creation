@@ -56,12 +56,8 @@ except ConfigParser.NoOptionError as err:
 
 
 def chunk_metadata(fp):
-    # Read the first 25 bytes and look for a new line.  Since this is a file
-    # formatted like a chunk, a end of the chunk header(a newline) should be
-    # found early.
-    header = fp.read(25)
-    eoh = header.find('\n')
-    chunktype, chunknum, hash_size, data_len = header[:eoh].split(':')
+    header = fp.readline().rstrip('\n')
+    chunktype, chunknum, hash_size, data_len = header.split(':')
     return dict(
         type=chunktype, num=chunknum, hash_size=hash_size, len=data_len,
         checksum=hashlib.sha256(fp.read()).hexdigest()
