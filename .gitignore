@@ -12,3 +12,6 @@ stage.ini
 __pycache__/
 *.py[cod]
 *$py.class
+
+# coverage files
+.coverage

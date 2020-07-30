@@ -11,13 +11,16 @@ import boto.s3.key
 from constants import (
     DEFAULT_DISCONNECT_LIST_CATEGORIES,
     DNT_SECTIONS,
+    VERS_LARGE_ENTITIES_SEPARATION_STARTED,
     LIST_TYPE_ENTITY,
     LIST_TYPE_TRACKER,
     LIST_TYPE_PLUGIN,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
-    WHITELIST_SECTIONS,
+    LARGE_ENTITIES_SECTIONS,
+    ENTITYLIST_SECTIONS,
 )
+from packaging import version as p_version
 
 CONFIG = ConfigParser.SafeConfigParser(os.environ)
 CONFIG.read(['shavar_list_creation.ini'])
@@ -41,12 +44,15 @@ try:
             CONFIG.get('main', 'remote_settings_username'),
             CONFIG.get('main', 'remote_settings_password')
         )
+    CLOUDFRONT_USER_ID = os.environ.get('CLOUDFRONT_USER_ID', None)
+
 except ConfigParser.NoOptionError as err:
     REMOTE_SETTINGS_URL = ''
     REMOTE_SETTINGS_AUTH = None
     REMOTE_SETTINGS_BUCKET = ''
     REMOTE_SETTINGS_COLLECTION = ''
     REMOTE_SETTINGS_RECORD_PATH = ''
+    CLOUDFRONT_USER_ID = None
 
 
 def chunk_metadata(fp):
@@ -151,6 +157,9 @@ def new_data_to_publish_to_s3(config, section, new):
             key.set_contents_from_string('a:1:32:32\n' + 32 * '1')
         current = tempfile.TemporaryFile()
         key.get_contents_to_file(current)
+        key.set_acl('bucket-owner-full-control')
+        if CLOUDFRONT_USER_ID is not None:
+            key.add_user_grant('READ', CLOUDFRONT_USER_ID)
         current.seek(0)
     else:
         current = open(config.get(section, 'output'), 'rb')
@@ -203,6 +212,9 @@ def publish_to_s3(config, section, chunknum):
         k = boto.s3.key.Key(bucket)
         k.key = key_name
         k.set_contents_from_filename(output_filename)
+        k.set_acl('bucket-owner-full-control')
+        if CLOUDFRONT_USER_ID is not None:
+            k.add_user_grant('READ', CLOUDFRONT_USER_ID)
     print('Uploaded to s3: %s' % section)
 
 
@@ -228,7 +240,7 @@ def publish_to_remote_settings(config, section):
                 excluded_categories.extend(x.split('|'))
     elif (section in PLUGIN_SECTIONS):
         list_type = LIST_TYPE_PLUGIN
-    elif (section in WHITELIST_SECTIONS):
+    elif (section in ENTITYLIST_SECTIONS):
         list_type = LIST_TYPE_ENTITY
 
     list_name = config.get(section, 'output')
@@ -258,6 +270,14 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
                 and config.getboolean(section, 'versioning_needed')
             )
             if not versioning_needed:
+                continue
+
+            version = p_version.parse(config.get(section, 'version'))
+            skip_large_entity_separation = (
+                version.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
+                and section in LARGE_ENTITIES_SECTIONS
+            )
+            if skip_large_entity_separation:
                 continue
             print('Publishing versioned lists for: ' + section)
 

@@ -9,12 +9,11 @@ PLUGIN_SECTIONS = (
     "flash-subdoc-exceptions",
     "flashinfobar-exceptions"
 )
-WHITELIST_SECTIONS = (
+ENTITYLIST_SECTIONS = (
     "entity-whitelist",
     "entity-whitelist-testing",
     "staging-entity-whitelist",
-    "fastblock1-whitelist",
-    "fastblock2-whitelist"
+    "google-whitelist"
 )
 PRE_DNT_SECTIONS = (
     "tracking-protection",
@@ -52,10 +51,7 @@ DNT_SECTIONS = (
     "tracking-protection-content-fingerprinting",
     "tracking-protection-base-cryptomining",
     "tracking-protection-content-cryptomining",
-    "tracking-protection-test-multitag",
-    "fastblock1",
-    "fastblock2",
-    "fastblock3"
+    "tracking-protection-test-multitag"
 )
 DNT_CONTENT_SECTIONS = (
     "tracking-protection-content",
@@ -74,31 +70,30 @@ DNT_W3C_SECTIONS = (
     "tracking-protection-basew3c",
     "tracking-protection-contentw3c"
 )
-FASTBLOCK_SECTIONS = (
-    "fastblock1",
-    "fastblock1-whitelist",
-    "fastblock2",
-    "fastblock2-whitelist",
-    "fastblock3"
-)
+LARGE_ENTITIES_SECTIONS = {
+    "google-whitelist",
+}
+STANDARD_ENTITY_SECTION = 'entity-whitelist'
 
-FINGERPRINTING_TAG = 'fingerprinting'
-CRYPTOMINING_TAG = 'cryptominer'
+
 SESSION_REPLAY_TAG = 'session-replay'
 PERFORMANCE_TAG = 'performance'
 ALL_TAGS = {
-    FINGERPRINTING_TAG,
-    CRYPTOMINING_TAG,
     SESSION_REPLAY_TAG,
     PERFORMANCE_TAG
 }
 
 TEST_DOMAIN_TEMPLATE = '%s.dummytracker.org'
 
-DEFAULT_DISCONNECT_LIST_CATEGORIES = [
-    'Advertising|Analytics|Social|Disconnect']
+DEFAULT_DISCONNECT_LIST_CATEGORIES = ['Advertising|Analytics|Social']
 DEFAULT_DISCONNECT_LIST_TAGS = {}
 
 LIST_TYPE_ENTITY = 'Entity'
 LIST_TYPE_PLUGIN = 'Plugin'
 LIST_TYPE_TRACKER = 'Tracker'
+
+LARGE_ENTITIES = [
+    'Google',
+]
+
+VERS_LARGE_ENTITIES_SEPARATION_STARTED = 74
