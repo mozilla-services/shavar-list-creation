@@ -300,7 +300,7 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
                 config, section, new
             )
         except (requests.exceptions.ConnectTimeout,
-                requests.exceptions.ReadTimeout) as exc:
+                requests.exceptions.ReadTimeout):
             print('Connection timed out on Remote Settings.')
             rs_upload_needed = False
         if not s3_upload_needed and not rs_upload_needed:
