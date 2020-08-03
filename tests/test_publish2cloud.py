@@ -1,25 +1,128 @@
-import time
+import ConfigParser
+import os
 
+import boto.s3.connection
+import boto.s3.key
+import pytest
 from mock import mock_open, patch
+from moto import mock_s3_deprecated as mock_s3
 
-from publish2cloud import chunk_metadata
+from publish2cloud import (
+    chunk_metadata,
+    new_data_to_publish_to_s3
+)
+
+
+TEST_LIST = (b"a:0123456789:32:32\n"
+             # Hash of test-track-digest256.dummytracker.org/
+             + b"q\xd8Q\xbe\x8b#\xad\xd9\xde\xdf\xa7B\x12\xf0D\xa2\xf2"
+             "\x1d\xcfx\xeaHi\x7f8%\xb5\x99\x83\xc1\x111")
+
+TEST_LIST_CHECKSUM = ("043493ecb63c5f143a372a5118d04a44df188f238d2b18e6"
+                      "cd848ae413a01090")
+
+TEST_CONFIG_SECTION = "test-tracking-protection"
+TEST_OUTPUT_FILENAME = "test-tracking-protection-digest256"
+
+TEST_S3_KEY = "test-key"
+TEST_S3_BUCKET = "test-bucket"
+
+
+# Use fixtures to set up a mocked s3 connection and fake AWS credentials
+# as suggested on https://github.com/spulec/moto#example-on-usage
+@pytest.fixture
+def aws_credentials():
+    """Mocked AWS credentials for moto."""
+    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
+    os.environ["AWS_SECURITY_TOKEN"] = "testing"
+    os.environ["AWS_SESSION_TOKEN"] = "testing"
+
+
+@pytest.fixture
+def s3(aws_credentials):
+    with mock_s3():
+        yield boto.s3.connection.S3Connection()
+
+
+@pytest.fixture
+def config():
+    config = ConfigParser.ConfigParser()
+    config.add_section("main")
+    config.add_section(TEST_CONFIG_SECTION)
+    config.set("main", "s3_bucket", TEST_S3_BUCKET)
+    config.set(TEST_CONFIG_SECTION, "s3_key", TEST_S3_KEY)
+    config.set(TEST_CONFIG_SECTION, "output", TEST_OUTPUT_FILENAME)
+    return config
 
 
 def test_chunk_metadata():
     """Test getting metadata from the chunk header of a list file."""
-    chunknum = int(time.time())
-    # Hash of test-track-digest256.dummytracker.org/
-    domain_hash = (b"q\xd8Q\xbe\x8b#\xad\xd9\xde\xdf\xa7B\x12\xf0D\xa2"
-                   "\xf2\x1d\xcfx\xeaHi\x7f8%\xb5\x99\x83\xc1\x111")
-    data = b"a:%d:32:32\n" % chunknum + domain_hash
-
-    with patch("test_publish2cloud.open", mock_open(read_data=data)):
+    with patch("test_publish2cloud.open", mock_open(read_data=TEST_LIST)):
         with open("base-fingerprinting-track-digest256", "rb") as fp:
             metadata = chunk_metadata(fp)
 
     assert metadata["type"] == "a"
-    assert metadata["num"] == str(chunknum)
+    assert metadata["num"] == "0123456789"
     assert metadata["hash_size"] == "32"
     assert metadata["len"] == "32"
-    assert metadata["checksum"] == ("043493ecb63c5f143a372a5118d04a44df"
-                                    "188f238d2b18e6cd848ae413a01090")
+    assert metadata["checksum"] == TEST_LIST_CHECKSUM
+
+
+def _populate_s3(s3, test_list=None, s3_key=TEST_S3_KEY):
+    """Add a bucket and store the given list under a key."""
+    bucket = s3.create_bucket(TEST_S3_BUCKET)
+    if test_list is not None:
+        key = boto.s3.key.Key(bucket)
+        key.key = s3_key
+        key.set_contents_from_string(test_list)
+
+
+def test_new_data_to_publish_to_s3_false(s3, config):
+    """Test new_data_to_publish_to_s3 when there is no new data."""
+    _populate_s3(s3, TEST_LIST)
+
+    assert not new_data_to_publish_to_s3(config, TEST_CONFIG_SECTION,
+                                         {"checksum": TEST_LIST_CHECKSUM})
+
+
+def test_new_data_to_publish_to_s3_true(s3, config):
+    """Test new_data_to_publish_to_s3 when there is new data."""
+    _populate_s3(s3, TEST_LIST + (32 * b"1"))
+
+    assert new_data_to_publish_to_s3(config, TEST_CONFIG_SECTION,
+                                     {"checksum": TEST_LIST_CHECKSUM})
+
+
+def test_new_data_to_publish_to_s3_new_list(s3, config, capsys):
+    """Test new_data_to_publish_to_s3 when the list is not in S3."""
+    _populate_s3(s3)
+
+    expected_print = ("%s looks like it hasn't been uploaded to "
+                      "s3://%s/%s\n" % (TEST_CONFIG_SECTION,
+                                        TEST_S3_BUCKET, TEST_S3_KEY))
+
+    assert new_data_to_publish_to_s3(config, TEST_CONFIG_SECTION,
+                                     {"checksum": TEST_LIST_CHECKSUM})
+    assert capsys.readouterr().out == expected_print
+
+
+def test_new_data_to_publish_to_s3_output_as_key(s3, config):
+    """Test that `output` is used as the S3 key when there is no `s3_key`."""
+    config.remove_option(TEST_CONFIG_SECTION, "s3_key")
+
+    _populate_s3(s3, TEST_LIST, TEST_OUTPUT_FILENAME)
+
+    assert not new_data_to_publish_to_s3(config, TEST_CONFIG_SECTION,
+                                         {"checksum": TEST_LIST_CHECKSUM})
+
+
+def test_new_data_to_publish_to_s3_empty_s3_key(s3, config):
+    """Test that new_data_to_publish_to_s3 raises error on empty `s3_key`."""
+    config.set(TEST_CONFIG_SECTION, "s3_key", "")
+
+    _populate_s3(s3)
+
+    with pytest.raises(ValueError):
+        new_data_to_publish_to_s3(config, TEST_CONFIG_SECTION,
+                                  {"checksum": TEST_LIST_CHECKSUM})
