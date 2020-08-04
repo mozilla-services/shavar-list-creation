@@ -9,11 +9,13 @@ from moto import mock_s3_deprecated as mock_s3
 
 from publish2cloud import (
     chunk_metadata,
-    new_data_to_publish_to_s3
+    new_data_to_publish_to_s3,
+    publish_to_s3
 )
 
 
-TEST_LIST = (b"a:0123456789:32:32\n"
+TEST_CHUNKNUM = "0123456789"
+TEST_LIST = (b"a:%s:32:32\n" % TEST_CHUNKNUM
              # Hash of test-track-digest256.dummytracker.org/
              + b"q\xd8Q\xbe\x8b#\xad\xd9\xde\xdf\xa7B\x12\xf0D\xa2\xf2"
              "\x1d\xcfx\xeaHi\x7f8%\xb5\x99\x83\xc1\x111")
@@ -63,7 +65,7 @@ def test_chunk_metadata():
             metadata = chunk_metadata(fp)
 
     assert metadata["type"] == "a"
-    assert metadata["num"] == "0123456789"
+    assert metadata["num"] == TEST_CHUNKNUM
     assert metadata["hash_size"] == "32"
     assert metadata["len"] == "32"
     assert metadata["checksum"] == TEST_LIST_CHECKSUM
@@ -126,3 +128,99 @@ def test_new_data_to_publish_to_s3_empty_s3_key(s3, config):
     with pytest.raises(ValueError):
         new_data_to_publish_to_s3(config, TEST_CONFIG_SECTION,
                                   {"checksum": TEST_LIST_CHECKSUM})
+
+
+def _publish_to_s3(config):
+    """Auxiliary function for publish_to_s3 tests."""
+    def mock_set_contents_from_filename(self, filename, *args, **kwargs):
+        assert filename == TEST_OUTPUT_FILENAME
+        boto.s3.key.Key.set_contents_from_string(self, TEST_LIST,
+                                                 *args, **kwargs)
+
+    with patch("publish2cloud.boto.s3.key.Key.set_contents_from_filename",
+               new=mock_set_contents_from_filename):
+        publish_to_s3(config, TEST_CONFIG_SECTION, TEST_CHUNKNUM)
+
+
+def test_publish_to_s3(s3, config, capsys):
+    """Test publishing a list to S3."""
+    bucket = s3.create_bucket(TEST_S3_BUCKET)
+
+    _publish_to_s3(config)
+
+    for name in (TEST_S3_KEY, TEST_OUTPUT_FILENAME + "/" + TEST_CHUNKNUM):
+        assert bucket.get_key(name).get_contents_as_string() == TEST_LIST
+    assert sum(1 for _ in bucket.list()) == 2
+    assert capsys.readouterr().out == ("Uploaded to s3: %s\n"
+                                       % TEST_CONFIG_SECTION)
+
+
+def test_publish_to_s3_section_bucket(s3, config, capsys):
+    """Test publish_to_s3 with a section-specific bucket."""
+    section_bucket = "other-bucket"
+    config.set(TEST_CONFIG_SECTION, "s3_bucket", section_bucket)
+    bucket = s3.create_bucket(section_bucket)
+
+    _publish_to_s3(config)
+
+    for name in (TEST_S3_KEY, TEST_OUTPUT_FILENAME + "/" + TEST_CHUNKNUM):
+        assert bucket.get_key(name).get_contents_as_string() == TEST_LIST
+    assert sum(1 for _ in bucket.list()) == 2
+    assert capsys.readouterr().out == ("Uploaded to s3: %s\n"
+                                       % TEST_CONFIG_SECTION)
+
+
+def test_publish_to_s3_output_as_key(s3, config, capsys):
+    """Test publish_to_s3 when when there is no `s3_key`."""
+    config.remove_option(TEST_CONFIG_SECTION, "s3_key")
+    bucket = s3.create_bucket(TEST_S3_BUCKET)
+
+    _publish_to_s3(config)
+
+    for name in (TEST_OUTPUT_FILENAME,
+                 TEST_OUTPUT_FILENAME + "/" + TEST_CHUNKNUM):
+        assert bucket.get_key(name).get_contents_as_string() == TEST_LIST
+    assert sum(1 for _ in bucket.list()) == 2
+    assert capsys.readouterr().out == ("Uploaded to s3: %s\n"
+                                       % TEST_CONFIG_SECTION)
+
+
+def test_publish_to_s3_versioning(s3, config, capsys):
+    """Test publish_to_s3 with list versioning."""
+    version = "78.0"
+    config.set(TEST_CONFIG_SECTION, "versioning_needed", "true")
+    config.set(TEST_CONFIG_SECTION, "version", version)
+    bucket = s3.create_bucket(TEST_S3_BUCKET)
+
+    _publish_to_s3(config)
+
+    for name in (TEST_S3_KEY, TEST_OUTPUT_FILENAME + "/" + version
+                 + "/" + TEST_CHUNKNUM):
+        assert bucket.get_key(name).get_contents_as_string() == TEST_LIST
+    assert sum(1 for _ in bucket.list()) == 2
+    assert capsys.readouterr().out == ("Uploaded to s3: %s\n"
+                                       % TEST_CONFIG_SECTION)
+
+
+def test_publish_to_s3_no_bucket(s3, config, capsys):
+    """Test publish_to_s3 when `s3_bucket` config option is empty."""
+    config.set(TEST_CONFIG_SECTION, "s3_bucket", "")
+
+    with pytest.raises(SystemExit) as e:
+        _publish_to_s3(config)
+
+    assert e.value.code == -1
+    assert capsys.readouterr().err == ("Can't upload to s3 without "
+                                       "s3_bucket and s3_key\n")
+
+
+def test_publish_to_s3_no_key(s3, config, capsys):
+    """Test publish_to_s3 when `s3_key` config option is empty."""
+    config.set(TEST_CONFIG_SECTION, "s3_key", "")
+
+    with pytest.raises(SystemExit) as e:
+        _publish_to_s3(config)
+
+    assert e.value.code == -1
+    assert capsys.readouterr().err == ("Can't upload to s3 without "
+                                       "s3_bucket and s3_key\n")
