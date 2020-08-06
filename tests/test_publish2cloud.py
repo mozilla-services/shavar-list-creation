@@ -130,6 +130,26 @@ def test_new_data_to_publish_to_s3_empty_s3_key(s3, config):
                                   {"checksum": TEST_LIST_CHECKSUM})
 
 
+def test_new_data_to_publish_to_s3_permissions(s3, config):
+    """Test that the expected S3 key permissions are set."""
+    _populate_s3(s3, TEST_LIST)
+
+    with patch("publish2cloud.CLOUDFRONT_USER_ID", "test-user-id"):
+        assert not new_data_to_publish_to_s3(
+            config, TEST_CONFIG_SECTION, {"checksum": TEST_LIST_CHECKSUM}
+        )
+
+    # FIXME
+    pytest.xfail("key.add_user_grant() does not work with moto")
+    key = s3.get_bucket(TEST_S3_BUCKET).get_key(TEST_S3_KEY)
+    grants = key.get_acl().acl.grants
+
+    assert len(grants) == 2
+    assert grants[0].permission == "FULL_CONTROL"
+    assert grants[1].permission == "READ"
+    assert grants[1].id == "test-user-id"
+
+
 def _publish_to_s3(config):
     """Auxiliary function for publish_to_s3 tests."""
     def mock_set_contents_from_filename(self, filename, *args, **kwargs):
@@ -224,3 +244,25 @@ def test_publish_to_s3_no_key(s3, config, capsys):
     assert e.value.code == -1
     assert capsys.readouterr().err == ("Can't upload to s3 without "
                                        "s3_bucket and s3_key\n")
+
+
+def test_publish_to_s3_permissions(s3, config, capsys):
+    """Test that the expected S3 key permissions are set."""
+    bucket = s3.create_bucket(TEST_S3_BUCKET)
+
+    with patch("publish2cloud.CLOUDFRONT_USER_ID", "test-user-id"):
+        _publish_to_s3(config)
+
+    for name in (TEST_S3_KEY, TEST_OUTPUT_FILENAME + "/" + TEST_CHUNKNUM):
+        assert bucket.get_key(name).get_contents_as_string() == TEST_LIST
+    assert sum(1 for _ in bucket.list()) == 2
+    assert capsys.readouterr().out == ("Uploaded to s3: %s\n"
+                                       % TEST_CONFIG_SECTION)
+    # FIXME
+    pytest.xfail("key.add_user_grant() does not work with moto")
+    for name in (TEST_S3_KEY, TEST_OUTPUT_FILENAME + "/" + TEST_CHUNKNUM):
+        grants = bucket.get_key(name).get_acl().acl.grants
+        assert len(grants) == 2
+        assert grants[0].permission == "FULL_CONTROL"
+        assert grants[1].permission == "READ"
+        assert grants[1].id == "test-user-id"
