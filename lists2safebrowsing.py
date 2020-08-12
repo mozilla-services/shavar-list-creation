@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import ConfigParser
+import configparser
 import hashlib
 import json
 import os
@@ -8,7 +8,8 @@ import re
 import requests
 import sys
 import time
-import urllib2
+from urllib.parse import quote, unquote
+from urllib.request import urlopen
 
 from packaging import version as p_version
 from publicsuffixlist import PublicSuffixList
@@ -58,7 +59,7 @@ def get_list_url(config, section, key):
     """Return the requested list URL (or the default, if it isn't found)"""
     try:
         url = config.get(section, key)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         url = config.get("main", "default_disconnect_url")
     return url
 
@@ -66,7 +67,7 @@ def get_list_url(config, section, key):
 def load_json_from_url(config, section, key):
     url = get_list_url(config, section, key)
     try:
-        loaded_json = json.loads(urllib2.urlopen(url).read())
+        loaded_json = json.loads(urlopen(url).read())
     except Exception as e:
         sys.stderr.write("Error loading %s: %s\n" % (url, repr(e)))
         sys.exit(-1)
@@ -91,7 +92,7 @@ def canonicalize(d):
     # repeatedly unescape until no more hex encodings
     while (1):
         _d = d
-        d = urllib2.unquote(_d)
+        d = unquote(_d)
         # if decoding had no effect, stop
         if (d == _d):
             break
@@ -142,7 +143,7 @@ def canonicalize(d):
     _url = ""
     for i in url:
         if (ord(i) <= 32 or ord(i) >= 127 or i == '#' or i == '%'):
-            _url += urllib2.quote(i)
+            _url += quote(i)
         else:
             _url += i
 
@@ -328,7 +329,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
             previous_domain = canonicalized_domain
 
     # Write safebrowsing-list format header
-    output_bytes = b"a:%u:32:%s\n" % (chunk, hashdata_bytes)
+    output_bytes = b"a:%d:32:%d\n" % (chunk, hashdata_bytes)
     output_bytes += b''.join(output)
     # When testing on shavar-prod-lists no output file is provided
     if output_file:
@@ -367,7 +368,7 @@ def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
             output.append(h.digest())
 
     # Write the data file
-    output_file.write(b"a:%u:32:%s\n" % (chunk, hashdata_bytes))
+    output_file.write(b"a:%d:32:%d\n" % (chunk, hashdata_bytes))
     for o in output:
         output_file.write(o)
 
@@ -400,7 +401,7 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
             output.append(h.digest())
 
     # Write the data file
-    output_file.write(b"a:%u:32:%s\n" % (chunk, hashdata_bytes))
+    output_file.write(b"a:%d:32:%d\n" % (chunk, hashdata_bytes))
     for o in output:
         output_file.write(o)
 
@@ -448,7 +449,7 @@ def get_tracker_lists(config, section, chunknum):
                 "Supported tags: %s\nConfig file tags: %s" %
                 (ALL_TAGS, desired_tags)
             )
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         desired_tags = DEFAULT_DISCONNECT_LIST_TAGS
 
     # Retrieve domains that match filters
@@ -512,7 +513,7 @@ def get_plugin_lists(config, section, chunknum):
                          "configuration file is empty. A plugin "
                          "blocklist URL must be specified." % section)
 
-    for line in urllib2.urlopen(blocklist_url).readlines():
+    for line in urlopen(blocklist_url).readlines():
         line = line.decode().strip()
         # don't add blank lines or comments
         if not line or line.startswith('#'):
@@ -562,7 +563,7 @@ def version_configurations(config, section, version, revert=False):
         new_source_url = initial_source_url_value
         old_s3_key = versioned_key
         new_s3_key = initial_s3_key_value
-        ver_val = None
+        ver_val = ""
 
     # change the config
     if config.has_option(section, source_url):
@@ -653,7 +654,7 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
 
 
 def main():
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     filename = config.read(["shavar_list_creation.ini"])
     if not filename:
         sys.stderr.write("Error loading shavar_list_creation.ini\n")

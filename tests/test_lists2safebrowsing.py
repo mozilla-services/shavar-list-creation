@@ -1,10 +1,10 @@
-import ConfigParser
+import configparser
 import hashlib
 import json
 import time
+from unittest.mock import call, patch, mock_open
 
 import pytest
-from mock import call, patch, mock_open
 from trackingprotection_tools import DisconnectParser
 
 import lists2safebrowsing as l2s
@@ -255,7 +255,7 @@ def chunknum():
 
 @pytest.fixture
 def config():
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     config.readfp(open("sample_shavar_list_creation.ini"))
     return config
 
@@ -302,8 +302,8 @@ def test_get_list_url(config, section, key, expected_url):
 def test_load_json_from_url(config):
     """Test loading the JSON entity list from a URL."""
     data = json.dumps(TEST_ENTITY_DICT)
-    with patch("lists2safebrowsing.urllib2.urlopen",
-               mock_open(read_data=data)) as mocked_open:
+    with patch("lists2safebrowsing.urlopen",
+               mock_open(read_data=data.encode())) as mocked_open:
         loaded_json = l2s.load_json_from_url(config, "entity-whitelist",
                                              "entity_url")
 
@@ -320,7 +320,7 @@ def test_load_json_from_url(config):
 def test_load_json_from_url_exception(capsys, config):
     """Test load_json_from_url when opening the URL fails."""
     error = Exception
-    with patch("lists2safebrowsing.urllib2.urlopen", side_effect=error):
+    with patch("lists2safebrowsing.urlopen", side_effect=error):
         with pytest.raises(SystemExit) as e:
             l2s.load_json_from_url(config, "entity-whitelist", "entity_url")
 
@@ -377,7 +377,7 @@ def _add_domain_to_list(domain, canonicalized_domain, previous_domain,
 def test_add_domain_to_list():
     """Test adding a domain to a blocklist."""
     domain = "https://www.host.com"
-    canonicalized_domain = "www.host.com"
+    canonicalized_domain = "www.host.com/"
     added, domain_hash, log_writes, output = (
         _add_domain_to_list(domain, canonicalized_domain, None, [])
     )
@@ -635,7 +635,7 @@ def test_process_list(capsys, chunknum, log, list_type):
 
 def _get_entity_or_plugin_lists(chunknum, config, function, section, data):
     """Auxiliary function for get_entity_lists/get_plugin_lists tests."""
-    with patch("lists2safebrowsing.urllib2.urlopen",
+    with patch("lists2safebrowsing.urlopen",
                mock_open(read_data=data.encode())) as mocked_urlopen, \
             patch("lists2safebrowsing.open", mock_open()) as mocked_open:
         output_file, _ = function(config, section, chunknum)

@@ -1,4 +1,4 @@
-import ConfigParser
+import configparser
 import hashlib
 import os
 import requests
@@ -22,7 +22,7 @@ from constants import (
 )
 from packaging import version as p_version
 
-CONFIG = ConfigParser.SafeConfigParser(os.environ)
+CONFIG = configparser.SafeConfigParser(os.environ)
 CONFIG.read(['shavar_list_creation.ini'])
 try:
     REMOTE_SETTINGS_URL = ''
@@ -46,7 +46,7 @@ try:
         )
     CLOUDFRONT_USER_ID = os.environ.get('CLOUDFRONT_USER_ID', None)
 
-except ConfigParser.NoOptionError as err:
+except configparser.NoOptionError as err:
     REMOTE_SETTINGS_URL = ''
     REMOTE_SETTINGS_AUTH = None
     REMOTE_SETTINGS_BUCKET = ''
