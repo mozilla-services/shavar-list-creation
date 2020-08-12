@@ -164,7 +164,7 @@ def add_domain_to_list(domain, canonicalized_domain, previous_domain,
     if psl.publicsuffix(psl_d) == psl_d:
         raise ValueError("Domain '%s' is in the public section of the "
                          "Public Suffix List" % psl_d)
-    domain_hash = hashlib.sha256(canonicalized_domain)
+    domain_hash = hashlib.sha256(canonicalized_domain.encode())
     if log_file:
         log_file.write("[m] %s >> %s\n" % (domain, canonicalized_domain))
         log_file.write("[canonicalized] %s\n" % (canonicalized_domain))
@@ -328,14 +328,14 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
             previous_domain = canonicalized_domain
 
     # Write safebrowsing-list format header
-    output_string = "a:%u:32:%s\n" % (chunk, hashdata_bytes)
-    output_string += ''.join(output)
+    output_bytes = b"a:%u:32:%s\n" % (chunk, hashdata_bytes)
+    output_bytes += b''.join(output)
     # When testing on shavar-prod-lists no output file is provided
     if output_file:
-        output_file.write(output_string)
+        output_file.write(output_bytes)
 
-    print("Tracking protection(%s): publishing %d items; file size %d" % (
-        name, publishing, len(output_string)))
+    print("Tracking protection(%s): publishing %d items; file size %d" %
+          (name, publishing, len(output_bytes)))
     return
 
 
@@ -349,17 +349,14 @@ def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
 
     for name, entity in sorted(incoming.items()):
         urls = set()
-        name = name.encode('utf-8')
         for prop in entity['properties']:
             for res in entity['resources']:
-                prop = prop.encode('utf-8')
-                res = res.encode('utf-8')
                 if prop == res:
                     continue
                 urls.add(canonicalize('%s/?resource=%s' % (prop, res)))
         urls = sorted(urls)
         for url in urls:
-            h = hashlib.sha256(url)
+            h = hashlib.sha256(url.encode())
             if log_file:
                 log_file.write(
                     "[entity] %s >> (canonicalized) %s, hash %s\n"
@@ -367,10 +364,10 @@ def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
                 )
             publishing += 1
             hashdata_bytes += 32
-            output.append(hashlib.sha256(url).digest())
+            output.append(h.digest())
 
     # Write the data file
-    output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
+    output_file.write(b"a:%u:32:%s\n" % (chunk, hashdata_bytes))
     for o in output:
         output_file.write(o)
 
@@ -391,7 +388,7 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
     domains.sort(key=lambda d: d[1])
     for domain, canonicalized_domain in domains:
         if canonicalized_domain != previous_domain:
-            h = hashlib.sha256(canonicalized_domain)
+            h = hashlib.sha256(canonicalized_domain.encode())
             if log_file:
                 log_file.write(
                     "[plugin-blocklist] %s >> (canonicalized) %s, hash %s\n"
@@ -400,10 +397,10 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
             publishing += 1
             hashdata_bytes += 32
             previous_domain = canonicalized_domain
-            output.append(hashlib.sha256(canonicalized_domain).digest())
+            output.append(h.digest())
 
     # Write the data file
-    output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
+    output_file.write(b"a:%u:32:%s\n" % (chunk, hashdata_bytes))
     for o in output:
         output_file.write(o)
 
@@ -516,7 +513,7 @@ def get_plugin_lists(config, section, chunknum):
                          "blocklist URL must be specified." % section)
 
     for line in urllib2.urlopen(blocklist_url).readlines():
-        line = line.strip()
+        line = line.decode().strip()
         # don't add blank lines or comments
         if not line or line.startswith('#'):
             continue

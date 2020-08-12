@@ -56,7 +56,7 @@ except ConfigParser.NoOptionError as err:
 
 
 def chunk_metadata(fp):
-    header = fp.readline().rstrip('\n')
+    header = fp.readline().decode().rstrip('\n')
     chunktype, chunknum, hash_size, data_len = header.split(':')
     return dict(
         type=chunktype, num=chunknum, hash_size=hash_size, len=data_len,
@@ -92,7 +92,7 @@ def put_new_record_remote_settings(config, section, data):
 
     if not rec_resp:
         print('Failed to create/update record for %s. Error: %s' %
-              (data['Name'], rec_resp.content))
+              (data['Name'], rec_resp.content.decode()))
         return rec_resp
 
     attachment_url = record_url + '/attachment'

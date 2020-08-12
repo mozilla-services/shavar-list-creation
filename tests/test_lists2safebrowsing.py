@@ -125,16 +125,16 @@ CATEGORY_FILTER_TESTCASES = (
 )
 
 TEST_DOMAIN_HASH = (b"q\xd8Q\xbe\x8b#\xad\xd9\xde\xdf\xa7B\x12\xf0D\xa2"
-                    "\xf2\x1d\xcfx\xeaHi\x7f8%\xb5\x99\x83\xc1\x111")
+                    b"\xf2\x1d\xcfx\xeaHi\x7f8%\xb5\x99\x83\xc1\x111")
 VERSIONED_TEST_DOMAIN_HASH = (b"C]~\x9e\xfeLL\xba\xf5\x17k!5\xe4t\xc4\xcc"
-                              "\xd2g\x84\x9cJ\xcb\x83;\xf4\x9f`jjYg")
+                              b"\xd2g\x84\x9cJ\xcb\x83;\xf4\x9f`jjYg")
 DUMMYTRACKER_DOMAIN_HASH = (b"\xe5\xa9\x07\xc8\xff6r\xa9\xcb\xc8\xf1\xd3"
-                            "\xa2\x11\x0c\\\xbe\x7f\xdb1\xbb^\xdfD\xbcX"
-                            "\xa8\xf1U;#\xe2")
+                            b"\xa2\x11\x0c\\\xbe\x7f\xdb1\xbb^\xdfD\xbcX"
+                            b"\xa8\xf1U;#\xe2")
 GOOGLE_DOMAIN_HASH = (b"\xbc\x9a\x8f+o\xff\xd5\x85q\xe1\x88\xbb\x11\x05E"
-                      "\xf8\xfb:\xf5\x1c\xdf\x1acimPZ\x98p\xa8[\xe5")
+                      b"\xf8\xfb:\xf5\x1c\xdf\x1acimPZ\x98p\xa8[\xe5")
 EXAMPLE_DOMAIN_HASH = (b"s\xd9\x86\xe0\t\x06_\x18,\x10\xbc\xb6\xa4]\xb3"
-                       "\xd6\xed\xa9I\x8f\x890eJ\xf2e?\x8a\x93\x8c\xd8\x01")
+                       b"\xd6\xed\xa9I\x8f\x890eJ\xf2e?\x8a\x93\x8c\xd8\x01")
 DOMAIN_HASHES = (DUMMYTRACKER_DOMAIN_HASH + EXAMPLE_DOMAIN_HASH
                  + GOOGLE_DOMAIN_HASH)
 
@@ -168,15 +168,15 @@ PROCESS_ENTITYLIST_EXPECTED_OUTPUT_WRITES = (
     b"a:%d:32:160\n",
     (
         (b"\xa0\xbc\xee\xcaR\x0f\xd6\"\x8e\xf6\x7f\xb1Y\x8dM\xa1#\xdd"
-         "\x0b\x18\nn\xb1\x1d\x02SW\x89\xfc;\xc5\xb3"),
+         b"\x0b\x18\nn\xb1\x1d\x02SW\x89\xfc;\xc5\xb3"),
         (b"}UA\xa3\x89e\xe6\xa0v\x1fA\xa6[\xd5+\xc3\xd9\xfe\x1d\x83\x90"
-         "\x161*\xa1f\x1e\x9ee\x9cV:"),
+         b"\x161*\xa1f\x1e\x9ee\x9cV:"),
         (b"\xd9`\xdd\xfe\x97\x96\xa3\xfdJ\xa89\x18\xa2Mgd}\x7f\xf2\xd1z"
-         "\x11\x13\xde(m}V{\xdb \xb2"),
+         b"\x11\x13\xde(m}V{\xdb \xb2"),
         (b"\xf3\xfa\xe4\x8a}\xd8\x8a\xae\xf3\xa0B\xe9\xc8q\xe5\xe1xL"
-         "\xc3,\x07\x95\x0f;}nK7\x03u\xea\x0e"),
+         b"\xc3,\x07\x95\x0f;}nK7\x03u\xea\x0e"),
         (b"\xa8\xe9\xe3EoF\xdb\xe4\x95Q\xc7\xda8`\xf6C\x93\xd8\xf9"
-         "\xd9oB\xb5\xae\x86\x92w\"Fuw\xdf"),
+         b"\xd9oB\xb5\xae\x86\x92w\"Fuw\xdf"),
     ),
 )
 
@@ -362,7 +362,7 @@ def test_canonicalize(url, expected):
 def _add_domain_to_list(domain, canonicalized_domain, previous_domain,
                         output):
     """Auxiliary function for add_domain_to_list tests."""
-    domain_hash = hashlib.sha256(canonicalized_domain.encode("utf-8"))
+    domain_hash = hashlib.sha256(canonicalized_domain.encode())
 
     with patch("test_lists2safebrowsing.open", mock_open()):
         with open("test_blocklist.log", "w") as log_file:
@@ -636,7 +636,7 @@ def test_process_list(capsys, chunknum, log, list_type):
 def _get_entity_or_plugin_lists(chunknum, config, function, section, data):
     """Auxiliary function for get_entity_lists/get_plugin_lists tests."""
     with patch("lists2safebrowsing.urllib2.urlopen",
-               mock_open(read_data=data)) as mocked_urlopen, \
+               mock_open(read_data=data.encode())) as mocked_urlopen, \
             patch("lists2safebrowsing.open", mock_open()) as mocked_open:
         output_file, _ = function(config, section, chunknum)
 
@@ -761,7 +761,7 @@ def test_get_tracker_lists(config, parser, chunknum, section, domains,
         test_domains.append("%s-%s" % (version.replace(".", "-"),
                                        test_domains[0]))
     expected_domains = test_domains + sorted(domains)
-    expected_hashes = [hashlib.sha256(d.encode("utf-8")).digest()
+    expected_hashes = [hashlib.sha256(d.encode()).digest()
                        for d in expected_domains]
     expected_bytes = hashlib.sha256().digest_size * len(expected_hashes)
     expected_header = b"a:%d:32:%d\n" % (chunknum, expected_bytes)
