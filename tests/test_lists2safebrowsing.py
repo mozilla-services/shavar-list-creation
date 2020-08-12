@@ -5,12 +5,14 @@ import time
 
 import pytest
 from mock import call, patch, mock_open
+from trackingprotection_tools import DisconnectParser
 
 import lists2safebrowsing as l2s
 from constants import (
     LIST_TYPE_ENTITY,
     LIST_TYPE_PLUGIN,
     STANDARD_ENTITY_SECTION,
+    TEST_DOMAIN_TEMPLATE
 )
 
 
@@ -80,6 +82,34 @@ CANONICALIZE_TESTCASES = (
     ("percent_escape_special_chars_1", "http://host.com/ab%23cd",
         "host.com/ab%23cd"),
     ("percent_escape_special_chars_2", "http://\x01\x7f.com/", "%01%7F.com/"),
+)
+
+CATEGORY_FILTER_TESTCASES = (
+    (
+        "single_category",
+        [["Content"]],
+        {"vimeo.com", "vimeocdn.com"},
+        (2,)
+    ),
+    (
+        "union",
+        [["Social", "Cryptomining"]],
+        {"twimg.com", "twitter.com", "twitter.jp", "coinpot.co",
+         "webmining.co"},
+        (5,)
+    ),
+    (
+        "intersection",
+        [["Advertising"], ["Fingerprinting"]],
+        {"appcast.io"},
+        (2, (3, 1))
+    ),
+    (
+        "union_intersection",
+        [["Advertising", "Analytics"], ["Fingerprinting"]],
+        {"appcast.io", "clickguard.com"},
+        (6, (3, 2))
+    ),
 )
 
 TEST_DOMAIN_HASH = (b"q\xd8Q\xbe\x8b#\xad\xd9\xde\xdf\xa7B\x12\xf0D\xa2"
@@ -161,6 +191,26 @@ PROCESS_PLUGIN_BLOCKLIST_EXPECTED_LOG_WRITE_INFO = (
         "bc9a8f2b6fffd58571e188bb110545f8fb3af51cdf1a63696d505a9870a85be5"),
 )
 
+GET_TRACKER_LISTS_TESTCASES = (
+    (
+        "default", "tracking-protection",
+        {"adnetwork.net", "appcast.io", "clickguard.com",
+         "google-analytics.com", "postrank.com", "twimg.com",
+         "twitter.com", "twitter.jp"}
+    ),
+    (
+        "categories", "tracking-protection-base-fingerprinting",
+        {"appcast.io", "clickguard.com"}
+    ),
+    (
+        "excluded_categories", "tracking-protection-content-fingerprinting",
+        {"base-fingerprinting-track-digest256.dummytracker.org/tracker.js"}
+    ),
+    ("tags", "tracking-protection-base-cryptomining", {"coinpot.co"}),
+    ("invalid_tag", "tracking-protection-ads", set()),
+    ("version", "tracking-protection-content-cryptomining", set()),
+)
+
 GET_ENTITY_LISTS_TESTCASES = (
     ("separation_standard", STANDARD_ENTITY_SECTION, None),
     ("separation_google", "google-whitelist", None),
@@ -181,6 +231,11 @@ LOG_MSG = "[{}] {} >> (canonicalized) {}, hash {}\n"
 @pytest.fixture
 def chunknum():
     return int(time.time())
+
+
+@pytest.fixture
+def parser():
+    return DisconnectParser(blocklist="tests/sample_blocklist.json")
 
 
 def test_canonicalize_return_type():
@@ -276,6 +331,92 @@ def test_add_domain_to_list_duplicate():
     assert not added
     assert output == [domain_hash.digest()]
     assert not log_writes
+
+
+def _get_expected_print(category_filters, print_info):
+    """Prepare expected print string for domain filtering tests."""
+    expected_print = (" * filter %s matched %d domains\n"
+                      % (category_filters[0], print_info[0]))
+
+    for f, p in zip(category_filters[1:], print_info[1:]):
+        expected_print += (" * filter %s matched %d domains. Reduced "
+                           "set to %d items.\n" % (f, p[0], p[1]))
+
+    return expected_print
+
+
+@pytest.mark.parametrize(
+    "category_filters,expected_output,print_info",
+    [pytest.param(category_filters, expected_output, print_info, id=id)
+        for id, category_filters, expected_output, print_info
+        in CATEGORY_FILTER_TESTCASES]
+)
+def test_get_domains_from_category_filters(capsys, parser, category_filters,
+                                           expected_output, print_info):
+    """Test filtering domains by category."""
+    output = l2s.get_domains_from_category_filters(parser, category_filters)
+
+    expected_print = _get_expected_print(category_filters, print_info)
+
+    assert output == expected_output
+    assert capsys.readouterr().out == expected_print
+
+
+def test_get_domains_from_category_filters_invalid_input():
+    """Test invalid input handling in get_domains_from_category_filters."""
+    with pytest.raises(ValueError):
+        l2s.get_domains_from_category_filters(None, "Advertising")
+
+
+def test_get_domains_from_filters(capsys, parser):
+    """Validate domain filtering."""
+    category_filters = [["Analytics"]]
+
+    output = l2s.get_domains_from_filters(parser, category_filters)
+
+    expected_output = {"clickguard.com", "google-analytics.com",
+                       "postrank.com"}
+    expected_print = _get_expected_print(category_filters, (4,))
+    expected_print += " * removing 1 rule(s) due to DNT exceptions\n"
+
+    assert output == expected_output
+    assert capsys.readouterr().out == expected_print
+
+
+def test_get_domains_from_filters_category_exclusion(capsys, parser):
+    """Validate domain filtering with category exclusion filters."""
+    category_filters = [["Advertising"]]
+    category_exclusion_filters = [["Fingerprinting"]]
+
+    output = l2s.get_domains_from_filters(parser, category_filters,
+                                          category_exclusion_filters)
+
+    expected_output = {"adnetwork.net"}
+    expected_print = _get_expected_print(category_filters, (2,))
+    expected_print += _get_expected_print(category_exclusion_filters, (3,))
+    expected_print += " * exclusion filters removed 1 domains from output\n"
+    expected_print += " * removing 1 rule(s) due to DNT exceptions\n"
+
+    assert output == expected_output
+    assert capsys.readouterr().out == expected_print
+
+
+def test_get_domains_from_filters_tags(capsys, parser):
+    """Validate domain filtering with tag filters."""
+    category_filters = [["Cryptomining"]]
+    tag_filters = "performance"
+
+    output = l2s.get_domains_from_filters(parser, category_filters,
+                                          tag_filters=tag_filters)
+
+    expected_output = {"coinpot.co"}
+    expected_print = _get_expected_print(category_filters, (2,))
+    expected_print += " * removing 1 rule(s) due to DNT exceptions\n"
+    expected_print += (" * found 1 rule(s) with filter %s. Filtered "
+                       "output to 1.\n" % tag_filters)
+
+    assert output == expected_output
+    assert capsys.readouterr().out == expected_print
 
 
 def _write_safebrowsing_blocklist(chunknum, version, write_to_file=True):
@@ -484,3 +625,53 @@ def test_get_plugin_lists_empty_url(chunknum):
 
     with pytest.raises(ValueError):
         l2s.get_plugin_lists(config, section, chunknum)
+
+
+@pytest.mark.parametrize(
+    "section,domains,testcase",
+    [pytest.param(section, domains, id, id=id)
+        for id, section, domains in GET_TRACKER_LISTS_TESTCASES]
+)
+def test_get_tracker_lists(parser, chunknum, section, domains, testcase):
+    """Test creating a tracker blocklist from a configuration section."""
+    config = ConfigParser.ConfigParser()
+    config.readfp(open("sample_shavar_list_creation.ini"))
+    version = None
+
+    if testcase == "default":
+        config.remove_option(section, "categories")
+    elif testcase == "tags":
+        config.set(section, "disconnect_tags", "performance,session-replay")
+    elif testcase == "invalid_tag":
+        config.set(section, "disconnect_tags", "invalid_tag")
+    elif testcase == "version":
+        version = "78.0"
+        config.set(section, "version", version)
+
+    with patch("lists2safebrowsing.DisconnectParser", return_value=parser), \
+            patch("lists2safebrowsing.open", mock_open()) as mocked_open:
+        if testcase == "invalid_tag":
+            with pytest.raises(ValueError):
+                l2s.get_tracker_lists(config, section, chunknum)
+            return
+        output_file, _ = l2s.get_tracker_lists(config, section, chunknum)
+
+    open_calls = mocked_open.call_args_list
+    output_filename = config.get(section, "output")
+    expected_open_calls = [call(output_filename, "wb"),
+                           call(output_filename + ".log", "w")]
+
+    output_write = output_file.write.call_args
+    test_domains = [TEST_DOMAIN_TEMPLATE % output_filename + "/"]
+    if version:
+        test_domains.append("%s-%s" % (version.replace(".", "-"),
+                                       test_domains[0]))
+    expected_domains = test_domains + [l2s.canonicalize(d) for d in domains]
+    expected_hashes = [hashlib.sha256(d.encode("utf-8")).digest()
+                       for d in expected_domains]
+    expected_bytes = hashlib.sha256().digest_size * len(expected_hashes)
+    expected_header = b"a:%d:32:%d\n" % (chunknum, expected_bytes)
+    expected_output = expected_header + b"".join(expected_hashes)
+
+    assert open_calls == expected_open_calls
+    assert output_write == call(expected_output)
