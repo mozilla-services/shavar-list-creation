@@ -22,7 +22,7 @@ from constants import (
 )
 from packaging import version as p_version
 
-CONFIG = configparser.SafeConfigParser(os.environ)
+CONFIG = configparser.ConfigParser(os.environ)
 CONFIG.read(['shavar_list_creation.ini'])
 try:
     REMOTE_SETTINGS_URL = ''

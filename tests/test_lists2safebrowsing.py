@@ -256,7 +256,7 @@ def chunknum():
 @pytest.fixture
 def config():
     config = configparser.ConfigParser()
-    config.readfp(open("sample_shavar_list_creation.ini"))
+    config.read_file(open("sample_shavar_list_creation.ini"))
     return config
 
 
