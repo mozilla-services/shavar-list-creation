@@ -16,6 +16,18 @@ from constants import (
 )
 
 
+GET_LIST_URL_TESTCASES = (
+    ("blocklist", "social-tracking-protection", "disconnect_url",
+        "https://raw.githubusercontent.com/mozilla-services/shavar-prod"
+        "-lists/master/social-tracking-protection-blacklist.json"),
+    ("entity", "entity-whitelist", "entity_url",
+        "https://raw.githubusercontent.com/mozilla-services/shavar-prod"
+        "-lists/master/disconnect-entitylist.json"),
+    ("default", "tracking-protection", "disconnect_url",
+        "https://raw.githubusercontent.com/mozilla-services/shavar-prod"
+        "-lists/master/disconnect-blacklist.json"),
+)
+
 CANONICALIZE_TESTCASES = (
     ("dummy_tracking_domain", "https://base-fingerprinting-track-digest256."
         "dummytracker.org/tracker.js", "base-fingerprinting-track-digest256."
@@ -222,7 +234,7 @@ ENTITY_LIST_URL = ("https://raw.githubusercontent.com/mozilla-services/"
 PLUGIN_LIST_URL = ("https://raw.githubusercontent.com/mozilla-services/"
                    "shavar-plugin-blocklist/master/mozplugin-block.txt")
 
-TEST_SECTION = "tracking-protection-test"
+TEST_SECTION = "tracking-protection"
 
 PRINT_MSG = "%s(%s): publishing %d items; file size %d\n"
 LOG_MSG = "[{}] {} >> (canonicalized) {}, hash {}\n"
@@ -234,8 +246,82 @@ def chunknum():
 
 
 @pytest.fixture
+def config():
+    config = ConfigParser.ConfigParser()
+    config.readfp(open("sample_shavar_list_creation.ini"))
+    return config
+
+
+@pytest.fixture
 def parser():
     return DisconnectParser(blocklist="tests/sample_blocklist.json")
+
+
+def test_get_output_and_log_files(config):
+    """Test getting output and log files from configuration file."""
+    with patch("lists2safebrowsing.open", mock_open()) as mocked_open:
+        output_file, log_file = l2s.get_output_and_log_files(config,
+                                                             TEST_SECTION)
+
+    expected_calls = [call("mozpub-track-digest256", "wb"),
+                      call("mozpub-track-digest256.log", "w")]
+
+    assert output_file is not None
+    assert log_file is not None
+    assert mocked_open.mock_calls == expected_calls
+
+
+def test_get_output_and_log_files_no_filename(config):
+    """Test get_output_and_log_files when filename is not specified."""
+    config.set(TEST_SECTION, "output", "")
+    output_file, log_file = l2s.get_output_and_log_files(config,
+                                                         TEST_SECTION)
+
+    assert output_file is None
+    assert log_file is None
+
+
+@pytest.mark.parametrize(
+    "section,key,expected_url",
+    [pytest.param(section, key, expected_url, id=id)
+        for id, section, key, expected_url in GET_LIST_URL_TESTCASES]
+)
+def test_get_list_url(config, section, key, expected_url):
+    """Validate getting list URL from configuration file."""
+    assert l2s.get_list_url(config, section, key) == expected_url
+
+
+def test_load_json_from_url(config):
+    """Test loading the JSON entity list from a URL."""
+    data = json.dumps(TEST_ENTITY_DICT)
+    with patch("lists2safebrowsing.urllib2.urlopen",
+               mock_open(read_data=data)) as mocked_open:
+        loaded_json = l2s.load_json_from_url(config, "entity-whitelist",
+                                             "entity_url")
+
+    urlopen_calls = mocked_open.call_args_list
+    expected_urlopen_calls = [call(ENTITY_LIST_URL)]
+    name, entity = sorted(loaded_json["entities"].items())[0]
+
+    assert urlopen_calls == expected_urlopen_calls
+    assert name == "Google"
+    assert entity["properties"] == ["blogspot.com", "youtube.com"]
+    assert entity["resources"] == ["gmail.com", "google-analytics.com"]
+
+
+def test_load_json_from_url_exception(capsys, config):
+    """Test load_json_from_url when opening the URL fails."""
+    error = Exception
+    with patch("lists2safebrowsing.urllib2.urlopen", side_effect=error):
+        with pytest.raises(SystemExit) as e:
+            l2s.load_json_from_url(config, "entity-whitelist", "entity_url")
+
+    expected_error_msg = (
+        "Error loading %s: %s\n" % (ENTITY_LIST_URL, repr(error()))
+    )
+
+    assert e.value.code == -1
+    assert capsys.readouterr().err == expected_error_msg
 
 
 def test_canonicalize_return_type():
@@ -551,11 +637,8 @@ def _get_entity_or_plugin_lists(chunknum, config, function, section, data):
     [pytest.param(section, version, id, id=id)
         for id, section, version in GET_ENTITY_LISTS_TESTCASES]
 )
-def test_get_entity_lists(chunknum, section, version, testcase):
+def test_get_entity_lists(config, chunknum, section, version, testcase):
     """Test creating an entity list from a configuration section."""
-    config = ConfigParser.ConfigParser()
-    config.readfp(open("sample_shavar_list_creation.ini"))
-
     if version:
         config.set(section, "version", version)
 
@@ -584,10 +667,8 @@ def test_get_entity_lists(chunknum, section, version, testcase):
     assert output_writes == expected_output_writes
 
 
-def test_get_plugin_lists(chunknum):
+def test_get_plugin_lists(config, chunknum):
     """Test creating a plugin blocklist from a configuration section."""
-    config = ConfigParser.ConfigParser()
-    config.readfp(open("sample_shavar_list_creation.ini"))
     section = "plugin-blocklist"
 
     domains = [d[1] for d in CANONICALIZE_TESTCASES[:2]]
@@ -615,10 +696,8 @@ def test_get_plugin_lists(chunknum):
     assert output_writes == expected_output_writes
 
 
-def test_get_plugin_lists_empty_url(chunknum):
+def test_get_plugin_lists_empty_url(config, chunknum):
     """Test empty blocklist URL handling in get_plugin_lists."""
-    config = ConfigParser.ConfigParser()
-    config.readfp(open("sample_shavar_list_creation.ini"))
     section = "plugin-blocklist"
 
     config.set(section, "blocklist", "")
@@ -632,10 +711,9 @@ def test_get_plugin_lists_empty_url(chunknum):
     [pytest.param(section, domains, id, id=id)
         for id, section, domains in GET_TRACKER_LISTS_TESTCASES]
 )
-def test_get_tracker_lists(parser, chunknum, section, domains, testcase):
+def test_get_tracker_lists(config, parser, chunknum, section, domains,
+                           testcase):
     """Test creating a tracker blocklist from a configuration section."""
-    config = ConfigParser.ConfigParser()
-    config.readfp(open("sample_shavar_list_creation.ini"))
     version = None
 
     if testcase == "default":
