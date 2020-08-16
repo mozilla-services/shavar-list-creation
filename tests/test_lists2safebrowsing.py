@@ -112,13 +112,13 @@ CATEGORY_FILTER_TESTCASES = (
     ),
     (
         "intersection",
-        [["Advertising"], ["Fingerprinting"]],
+        [["Advertising"], ["FingerprintingInvasive"]],
         {"appcast.io"},
         (2, (3, 1))
     ),
     (
         "union_intersection",
-        [["Advertising", "Analytics"], ["Fingerprinting"]],
+        [["Advertising", "Analytics"], ["FingerprintingInvasive"]],
         {"appcast.io", "clickguard.com"},
         (6, (3, 2))
     ),
@@ -472,7 +472,7 @@ def test_get_domains_from_filters(capsys, parser):
 def test_get_domains_from_filters_category_exclusion(capsys, parser):
     """Validate domain filtering with category exclusion filters."""
     category_filters = [["Advertising"]]
-    category_exclusion_filters = [["Fingerprinting"]]
+    category_exclusion_filters = [["FingerprintingInvasive"]]
 
     output = l2s.get_domains_from_filters(parser, category_filters,
                                           category_exclusion_filters)

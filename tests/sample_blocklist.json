@@ -52,7 +52,7 @@
         }
       }
     ],
-    "Fingerprinting": [
+    "FingerprintingInvasive": [
       {
         "AppCast": {
           "https://appcast.io/": [

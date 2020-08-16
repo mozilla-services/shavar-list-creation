@@ -208,9 +208,9 @@ def get_domains_from_filters(parser, category_filters,
         to restrict the list to. If more than one filter is provided, the
         intersection of the filters is returned.
         Example:
-            `[['Advertising', 'Analytics'], ['Fingerprinting']]` will return
-            domains in either the Advertising or Analytics category AND in the
-            Fingerprinting category.
+            `[['Advertising', 'Analytics'], ['FingerprintingInvasive']]`
+            will return domains in either the Advertising or Analytics
+            category AND in the FingerprintingInvasive category.
     category_exclusion_filters : list of lists of strings, optional
         A filter to exclude domains from the specified top-level categories.
         The list format is the same as `category_filters`.
