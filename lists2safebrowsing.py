@@ -285,8 +285,8 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     # Remember the previous domain so we don't print it more than once
     previous_domain = None
 
-    # Array holding hash bytes to be written to f_out. We need the total bytes
-    # before writing anything.
+    # Array holding hash bytes to be written to output_file. We need the
+    # total bytes before writing anything
     output = []
 
     # Add a static test domain to list
@@ -597,7 +597,7 @@ def revert_config(config, version):
 
 def get_versioned_lists(config, chunknum, version):
     """
-    Checks `versioning_needed` in each sections then versions the tracker lists
+    Checks `versioning_needed` in each section then versions the tracker lists
     by overwriting the existing SafeBrowsing formatted files.
     """
     edit_config(
