@@ -194,9 +194,10 @@ PROCESS_ENTITYLIST_EXPECTED_LOG_WRITE_INFO = (
 )
 
 PROCESS_PLUGIN_BLOCKLIST_EXPECTED_OUTPUT_WRITES = (
-    b"a:%d:32:64\n",
+    b"a:%d:32:96\n",
     (
         DUMMYTRACKER_DOMAIN_HASH,
+        EXAMPLE_DOMAIN_HASH,
         GOOGLE_DOMAIN_HASH,
     ),
 )
@@ -204,7 +205,9 @@ PROCESS_PLUGIN_BLOCKLIST_EXPECTED_OUTPUT_WRITES = (
 PROCESS_PLUGIN_BLOCKLIST_EXPECTED_LOG_WRITE_INFO = (
     (CANONICALIZE_TESTCASES[0][1], CANONICALIZE_TESTCASES[0][2],
         "e5a907c8ff3672a9cbc8f1d3a2110c5cbe7fdb31bb5edf44bc58a8f1553b23e2"),
-    (CANONICALIZE_TESTCASES[1][1], CANONICALIZE_TESTCASES[1][2],
+    ("example.com/", "example.com/",
+        "73d986e009065f182c10bcb6a45db3d6eda9498f8930654af2653f8a938cd801"),
+    ("https://www.google.com", "www.google.com/",
         "bc9a8f2b6fffd58571e188bb110545f8fb3af51cdf1a63696d505a9870a85be5"),
 )
 
@@ -593,13 +596,16 @@ def test_process_list(capsys, chunknum, log, list_type):
         print_id = "Entity list"
         domains_number = 5
     else:
-        incoming = [d[1] for d in CANONICALIZE_TESTCASES[:2]]
+        # Include the dummytracker domain twice in the input list to make
+        # sure it is only added to the blocklist once
+        incoming = [CANONICALIZE_TESTCASES[0][1], "https://www.google.com",
+                    "example.com/", CANONICALIZE_TESTCASES[0][2]]
         function = l2s.process_plugin_blocklist
         header, hashes = PROCESS_PLUGIN_BLOCKLIST_EXPECTED_OUTPUT_WRITES
         log_info = PROCESS_PLUGIN_BLOCKLIST_EXPECTED_LOG_WRITE_INFO
         log_id = "plugin-blocklist"
         print_id = "Plugin blocklist"
-        domains_number = 2
+        domains_number = 3
 
     with patch("test_lists2safebrowsing.open", mock_open()):
         with open("test-list.log", "w") as log_file:
@@ -621,6 +627,7 @@ def test_process_list(capsys, chunknum, log, list_type):
     # FIXME: os.fstat returns 0 size for the mocked file
     expected_print = PRINT_MSG % (print_id, TEST_SECTION, domains_number, 0)
 
+    # Ensure hashes are written in correct order and without duplicates
     assert output_writes == expected_output_writes
     assert log_writes == expected_log_writes
     assert capsys.readouterr().out == expected_print
@@ -681,7 +688,8 @@ def test_get_plugin_lists(config, chunknum):
     """Test creating a plugin blocklist from a configuration section."""
     section = "plugin-blocklist"
 
-    domains = [d[1] for d in CANONICALIZE_TESTCASES[:2]]
+    domains = [CANONICALIZE_TESTCASES[0][1], "https://www.google.com",
+               "example.com/", CANONICALIZE_TESTCASES[0][2]]
     # Add a comment line and a line with whitespace
     data = "\n".join(["# Comment", "    "] + domains)
 
@@ -694,11 +702,9 @@ def test_get_plugin_lists(config, chunknum):
                            call(output_filename + ".log", "w")]
 
     expected_hashes = PROCESS_PLUGIN_BLOCKLIST_EXPECTED_OUTPUT_WRITES[1]
-    # FIXME: Reversing the list of hashes will not be needed when
-    # alphanumerical ordering is enforced
     expected_output_writes = (
         [call(b"a:%d:32:%d\n" % (chunknum, len(expected_hashes) * 32))]
-        + [call(h) for h in reversed(expected_hashes)]
+        + [call(h) for h in expected_hashes]
     )
 
     assert urlopen_calls == expected_urlopen_calls

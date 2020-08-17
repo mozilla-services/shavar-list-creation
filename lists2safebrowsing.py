@@ -382,25 +382,27 @@ def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
 def process_plugin_blocklist(incoming, chunk, output_file, log_file,
                              list_variant):
     publishing = 0
-    domains = set()
     hashdata_bytes = 0
+    previous_domain = None
     output = []
-    for d in incoming:
-        canon_d = canonicalize(d.encode('utf-8'))
-        if canon_d not in domains:
-            h = hashlib.sha256(canon_d)
+
+    domains = [(d, canonicalize(d)) for d in incoming]
+    domains.sort(key=lambda d: d[1])
+    for domain, canonicalized_domain in domains:
+        if canonicalized_domain != previous_domain:
+            h = hashlib.sha256(canonicalized_domain)
             if log_file:
                 log_file.write(
                     "[plugin-blocklist] %s >> (canonicalized) %s, hash %s\n"
-                    % (d, canon_d, h.hexdigest())
+                    % (domain, canonicalized_domain, h.hexdigest())
                 )
             publishing += 1
-            domains.add(canon_d)
             hashdata_bytes += 32
-            output.append(hashlib.sha256(canon_d).digest())
+            previous_domain = canonicalized_domain
+            output.append(hashlib.sha256(canonicalized_domain).digest())
+
     # Write the data file
     output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
-    # FIXME: we should really sort the output
     for o in output:
         output_file.write(o)
 
