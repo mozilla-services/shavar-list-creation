@@ -281,7 +281,8 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
         upload_to_s3 = check_upload_config(config, section, 's3_upload')
 
         upload_to_remote_setting = check_upload_config(
-            config, section, 'remote_settings_upload')
+            config, section, 'remote_settings_upload'
+        )
 
         if not upload_to_s3 and not upload_to_remote_setting:
             print('Upload to Remote Setting and S3 disabled.')
