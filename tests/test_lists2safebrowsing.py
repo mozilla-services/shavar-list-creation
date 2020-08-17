@@ -158,7 +158,7 @@ TEST_ENTITY_DICT = {
         "resources": ["gmail.com", "google-analytics.com"]
       },
       "Twitter": {
-        "properties": ["twitter.com"],
+        "properties": ["twitter.com", "twitter.com"],
         "resources": ["twimg.com", "twitter.com"]
       },
     }

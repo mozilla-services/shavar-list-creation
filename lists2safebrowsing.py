@@ -344,10 +344,11 @@ def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
     Expects a dict from a loaded JSON blob.
     """
     publishing = 0
-    urls = set()
     hashdata_bytes = 0
     output = []
+
     for name, entity in sorted(incoming.items()):
+        urls = set()
         name = name.encode('utf-8')
         for prop in entity['properties']:
             for res in entity['resources']:
@@ -355,21 +356,21 @@ def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
                 res = res.encode('utf-8')
                 if prop == res:
                     continue
-                d = canonicalize('%s/?resource=%s' % (prop, res))
-                h = hashlib.sha256(d)
-                if log_file:
-                    log_file.write(
-                        "[entity] %s >> (canonicalized) %s, hash %s\n"
-                        % (name, d, h.hexdigest())
-                    )
-                urls.add(d)
-                publishing += 1
-                hashdata_bytes += 32
-                output.append(hashlib.sha256(d).digest())
+                urls.add(canonicalize('%s/?resource=%s' % (prop, res)))
+        urls = sorted(urls)
+        for url in urls:
+            h = hashlib.sha256(url)
+            if log_file:
+                log_file.write(
+                    "[entity] %s >> (canonicalized) %s, hash %s\n"
+                    % (name, url, h.hexdigest())
+                )
+            publishing += 1
+            hashdata_bytes += 32
+            output.append(hashlib.sha256(url).digest())
 
     # Write the data file
     output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
-    # FIXME: we should really sort the output
     for o in output:
         output_file.write(o)
 
