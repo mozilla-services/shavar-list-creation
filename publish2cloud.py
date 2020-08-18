@@ -56,12 +56,8 @@ except ConfigParser.NoOptionError as err:
 
 
 def chunk_metadata(fp):
-    # Read the first 25 bytes and look for a new line.  Since this is a file
-    # formatted like a chunk, a end of the chunk header(a newline) should be
-    # found early.
-    header = fp.read(25)
-    eoh = header.find('\n')
-    chunktype, chunknum, hash_size, data_len = header[:eoh].split(':')
+    header = fp.readline().rstrip('\n')
+    chunktype, chunknum, hash_size, data_len = header.split(':')
     return dict(
         type=chunktype, num=chunknum, hash_size=hash_size, len=data_len,
         checksum=hashlib.sha256(fp.read()).hexdigest()
@@ -106,14 +102,14 @@ def put_new_record_remote_settings(config, section, data):
     return att_resp
 
 
-def check_upload_remote_settings_config(config, section):
-    if config.has_option(section, 'remote_settings_upload'):
-        # if it exists, the specfic section's upload config is prioritized
-        return config.getboolean(section, 'remote_settings_upload')
+def check_upload_config(config, section, option):
+    if config.has_option(section, option):
+        # if it exists, the specific section's upload config is prioritized
+        return config.getboolean(section, option)
 
-    if config.has_option('main', 'remote_settings_upload'):
-        # if it exists, the deafult config is used
-        return config.getboolean('main', 'remote_settings_upload')
+    if config.has_option('main', option):
+        # if it exists, the default config is used
+        return config.getboolean('main', option)
     return False
 
 
@@ -137,41 +133,42 @@ def new_data_to_publish_to_remote_settings(config, section, new):
 
 
 def new_data_to_publish_to_s3(config, section, new):
-    # Get the metadata for our old chunk
+    """Determine whether a list stored on S3 needs to be updated.
 
-    # If necessary fetch the existing data from S3, otherwise open a local file
-    if ((config.has_option('main', 's3_upload')
-         and config.getboolean('main', 's3_upload'))
-        or (config.has_option(section, 's3_upload')
-            and config.getboolean(section, 's3_upload'))):
-        conn = boto.s3.connection.S3Connection()
-        bucket = conn.get_bucket(config.get('main', 's3_bucket'))
-        s3key = config.get(section, 's3_key') or config.get(section, 'output')
-        key = bucket.get_key(s3key)
-        if key is None:
-            # most likely a new list
-            print('{0} looks like it hasn\'t been uploaded to '
-                  's3://{1}/{2}'.format(section, bucket.name, s3key))
-            key = boto.s3.key.Key(bucket)
-            key.key = s3key
-            key.set_contents_from_string('a:1:32:32\n' + 32 * '1')
-        current = tempfile.TemporaryFile()
-        key.get_contents_to_file(current)
-        key.set_acl('bucket-owner-full-control')
-        if CLOUDFRONT_USER_ID is not None:
-            key.add_user_grant('READ', CLOUDFRONT_USER_ID)
-        current.seek(0)
-    else:
-        current = open(config.get(section, 'output'), 'rb')
+    Return True if:
+      - The checksum of the new list is not equal to that of the list
+        currently stored on S3
+      - The list is new and has not been uploaded to S3 yet
+    """
+    # Get the metadata for our old chunk
+    conn = boto.s3.connection.S3Connection()
+    bucket = conn.get_bucket(config.get('main', 's3_bucket'))
+    s3key = config.get(section, 'output')
+    if config.has_option(section, 's3_key'):
+        s3key = config.get(section, 's3_key')
+        if s3key == "":
+            raise ValueError("Configuration section '%s': 's3_key' "
+                             "option cannot be empty." % section)
+    key = bucket.get_key(s3key)
+    if key is None:
+        # Most likely a new list
+        print('{0} looks like it hasn\'t been uploaded to '
+              's3://{1}/{2}'.format(section, bucket.name, s3key))
+        return True
+    current = tempfile.TemporaryFile()
+    key.get_contents_to_file(current)
+    key.set_acl('bucket-owner-full-control')
+    if CLOUDFRONT_USER_ID is not None:
+        key.add_user_grant('READ', CLOUDFRONT_USER_ID)
+    current.seek(0)
 
     old = chunk_metadata(current)
     current.close()
 
-    s3_upload_needed = False
     if old['checksum'] != new['checksum']:
-        s3_upload_needed = True
+        return True
 
-    return s3_upload_needed
+    return False
 
 
 def publish_to_s3(config, section, chunknum):
@@ -281,13 +278,11 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
                 continue
             print('Publishing versioned lists for: ' + section)
 
-        upload_to_s3 = True
-        if (config.has_option(section, "s3_upload")
-                and not config.getboolean(section, "s3_upload")):
-            upload_to_s3 = False
+        upload_to_s3 = check_upload_config(config, section, 's3_upload')
 
-        upload_to_remote_setting = check_upload_remote_settings_config(
-            config, section)
+        upload_to_remote_setting = check_upload_config(
+            config, section, 'remote_settings_upload'
+        )
 
         if not upload_to_s3 and not upload_to_remote_setting:
             print('Upload to Remote Setting and S3 disabled.')
@@ -295,18 +290,23 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
 
         with open(config.get(section, 'output'), 'rb') as blob:
             new = chunk_metadata(blob)
+
+        if upload_to_s3:
             s3_upload_needed = new_data_to_publish_to_s3(config, section, new)
-            try:
-                rs_upload_needed = new_data_to_publish_to_remote_settings(
-                    config, section, new
-                )
-            except (requests.exceptions.ConnectTimeout,
-                    requests.exceptions.ReadTimeout) as exc:
-                print('Connection timed out on Remote Settings.')
-                rs_upload_needed = False
-            if not s3_upload_needed and not rs_upload_needed:
-                print('No new data to publish for %s' % section)
-                continue
+        else:
+            s3_upload_needed = False
+
+        try:
+            rs_upload_needed = new_data_to_publish_to_remote_settings(
+                config, section, new
+            )
+        except (requests.exceptions.ConnectTimeout,
+                requests.exceptions.ReadTimeout):
+            print('Connection timed out on Remote Settings.')
+            rs_upload_needed = False
+        if not s3_upload_needed and not rs_upload_needed:
+            print('No new data to publish for %s' % section)
+            continue
 
         if s3_upload_needed and upload_to_s3:
             publish_to_s3(config, section, chunknum)
