@@ -67,8 +67,8 @@ def load_json_from_url(config, section, key):
     url = get_list_url(config, section, key)
     try:
         loaded_json = json.loads(urllib2.urlopen(url).read())
-    except Exception:
-        sys.stderr.write("Error loading %s\n" % url)
+    except Exception as e:
+        sys.stderr.write("Error loading %s: %s\n" % (url, repr(e)))
         sys.exit(-1)
     return loaded_json
 
@@ -202,16 +202,16 @@ def get_domains_from_filters(parser, category_filters,
     ----------
     parser : DisconnectParser
         An instance of the Disconnect list parser
-    category_filters : list of list of strings
+    category_filters : list of lists of strings
         A filter to restrict output to the specified top-level categories.
         Each filter should be a comma-separated list of top-level categories
         to restrict the list to. If more than one filter is provided, the
         intersection of the filters is returned.
         Example:
-            `[['Advertising', 'Analytics'], ['Fingerprinting']]` will return
-            domains in either the Advertising or Analytics category AND in the
-            Fingerprinting category.
-    category_exclusion_filters : list of list of strings, optional
+            `[['Advertising', 'Analytics'], ['FingerprintingInvasive']]`
+            will return domains in either the Advertising or Analytics
+            category AND in the FingerprintingInvasive category.
+    category_exclusion_filters : list of lists of strings, optional
         A filter to exclude domains from the specified top-level categories.
         The list format is the same as `category_filters`.
     dnt_filter : string, optional
@@ -319,6 +319,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     # Write safebrowsing-list format header
     output_string = "a:%u:32:%s\n" % (chunk, hashdata_bytes)
     output_string += ''.join(output)
+    # When testing on shavar-prod-lists no output file is provided
     if output_file:
         output_file.write(output_string)
 
@@ -520,6 +521,29 @@ def get_entity_lists(config, section, chunknum):
     return output_file, log_file
 
 
+def get_plugin_lists(config, section, chunknum):
+    # load the plugin blocklist
+    blocked = set()
+    blocklist_url = config.get(section, "blocklist")
+    if not blocklist_url:
+        raise ValueError("The 'blocklist' key in section '%s' of the "
+                         "configuration file is empty. A plugin "
+                         "blocklist URL must be specified." % section)
+
+    for line in urllib2.urlopen(blocklist_url).readlines():
+        line = line.strip()
+        # don't add blank lines or comments
+        if not line or line.startswith('#'):
+            continue
+        blocked.add(line)
+
+    output_file, log_file = get_output_and_log_files(config, section)
+    process_plugin_blocklist(blocked, chunknum, output_file, log_file,
+                             section)
+
+    return output_file, log_file
+
+
 def edit_config(config, section, option, old_value, new_value):
     current = config.get(section, option)
     edited_config = current.replace(old_value, new_value)
@@ -664,20 +688,7 @@ def main():
                 config, section, chunknum)
 
         if section in PLUGIN_SECTIONS:
-            # load the plugin blocklist
-            blocked = set()
-            blocklist_url = config.get(section, "blocklist")
-            if blocklist_url:
-                for line in urllib2.urlopen(blocklist_url).readlines():
-                    line = line.strip()
-                    # don't add blank lines or comments
-                    if not line or line.startswith('#'):
-                        continue
-                    blocked.add(line)
-
-            output_file, log_file = get_output_and_log_files(config, section)
-            process_plugin_blocklist(blocked, chunknum, output_file, log_file,
-                                     section)
+            output_file, log_file = get_plugin_lists(config, section, chunknum)
 
         if section in ENTITYLIST_SECTIONS:
             output_file, log_file = get_entity_lists(config, section, chunknum)
