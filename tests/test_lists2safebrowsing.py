@@ -131,17 +131,23 @@ VERSIONED_TEST_DOMAIN_HASH = (b"C]~\x9e\xfeLL\xba\xf5\x17k!5\xe4t\xc4\xcc"
 DUMMYTRACKER_DOMAIN_HASH = (b"\xe5\xa9\x07\xc8\xff6r\xa9\xcb\xc8\xf1\xd3"
                             "\xa2\x11\x0c\\\xbe\x7f\xdb1\xbb^\xdfD\xbcX"
                             "\xa8\xf1U;#\xe2")
+GOOGLE_DOMAIN_HASH = (b"\xbc\x9a\x8f+o\xff\xd5\x85q\xe1\x88\xbb\x11\x05E"
+                      "\xf8\xfb:\xf5\x1c\xdf\x1acimPZ\x98p\xa8[\xe5")
+EXAMPLE_DOMAIN_HASH = (b"s\xd9\x86\xe0\t\x06_\x18,\x10\xbc\xb6\xa4]\xb3"
+                       "\xd6\xed\xa9I\x8f\x890eJ\xf2e?\x8a\x93\x8c\xd8\x01")
+DOMAIN_HASHES = (DUMMYTRACKER_DOMAIN_HASH + EXAMPLE_DOMAIN_HASH
+                 + GOOGLE_DOMAIN_HASH)
 
 WRITE_SAFEBROWSING_BLOCKLIST_TESTCASES = (
     ("version", "78.0",
-        (3, 115, b"a:%d:32:96\n", (TEST_DOMAIN_HASH
-                                   + VERSIONED_TEST_DOMAIN_HASH
-                                   + DUMMYTRACKER_DOMAIN_HASH))),
+        (5, 180, b"a:%d:32:160\n", (TEST_DOMAIN_HASH
+                                    + VERSIONED_TEST_DOMAIN_HASH
+                                    + DOMAIN_HASHES))),
     ("no_version", None,
-        (2, 83, b"a:%d:32:64\n", (TEST_DOMAIN_HASH
-                                  + DUMMYTRACKER_DOMAIN_HASH))),
+        (4, 148, b"a:%d:32:128\n", (TEST_DOMAIN_HASH
+                                    + DOMAIN_HASHES))),
     ("no_test_domains", "78.0",
-        (1, 51, b"a:%d:32:32\n", DUMMYTRACKER_DOMAIN_HASH)),
+        (3, 115, b"a:%d:32:96\n", DOMAIN_HASHES)),
 )
 
 TEST_ENTITY_DICT = {
@@ -152,7 +158,7 @@ TEST_ENTITY_DICT = {
         "resources": ["gmail.com", "google-analytics.com"]
       },
       "Twitter": {
-        "properties": ["twitter.com"],
+        "properties": ["twitter.com", "twitter.com"],
         "resources": ["twimg.com", "twitter.com"]
       },
     }
@@ -188,37 +194,39 @@ PROCESS_ENTITYLIST_EXPECTED_LOG_WRITE_INFO = (
 )
 
 PROCESS_PLUGIN_BLOCKLIST_EXPECTED_OUTPUT_WRITES = (
-    b"a:%d:32:64\n",
+    b"a:%d:32:96\n",
     (
         DUMMYTRACKER_DOMAIN_HASH,
-        (b"\xbc\x9a\x8f+o\xff\xd5\x85q\xe1\x88\xbb\x11\x05E\xf8\xfb:"
-         "\xf5\x1c\xdf\x1acimPZ\x98p\xa8[\xe5"),
+        EXAMPLE_DOMAIN_HASH,
+        GOOGLE_DOMAIN_HASH,
     ),
 )
 
 PROCESS_PLUGIN_BLOCKLIST_EXPECTED_LOG_WRITE_INFO = (
     (CANONICALIZE_TESTCASES[0][1], CANONICALIZE_TESTCASES[0][2],
         "e5a907c8ff3672a9cbc8f1d3a2110c5cbe7fdb31bb5edf44bc58a8f1553b23e2"),
-    (CANONICALIZE_TESTCASES[1][1], CANONICALIZE_TESTCASES[1][2],
+    ("example.com/", "example.com/",
+        "73d986e009065f182c10bcb6a45db3d6eda9498f8930654af2653f8a938cd801"),
+    ("https://www.google.com", "www.google.com/",
         "bc9a8f2b6fffd58571e188bb110545f8fb3af51cdf1a63696d505a9870a85be5"),
 )
 
 GET_TRACKER_LISTS_TESTCASES = (
     (
         "default", "tracking-protection",
-        {"adnetwork.net", "appcast.io", "clickguard.com",
-         "google-analytics.com", "postrank.com", "twimg.com",
-         "twitter.com", "twitter.jp"}
+        {"adnetwork.net/", "appcast.io/", "clickguard.com/",
+         "google-analytics.com/", "postrank.com/", "twimg.com/",
+         "twitter.com/", "twitter.jp/"}
     ),
     (
         "categories", "tracking-protection-base-fingerprinting",
-        {"appcast.io", "clickguard.com"}
+        {"appcast.io/", "clickguard.com/"}
     ),
     (
         "excluded_categories", "tracking-protection-content-fingerprinting",
         {"base-fingerprinting-track-digest256.dummytracker.org/tracker.js"}
     ),
-    ("tags", "tracking-protection-base-cryptomining", {"coinpot.co"}),
+    ("tags", "tracking-protection-base-cryptomining", {"coinpot.co/"}),
     ("invalid_tag", "tracking-protection-ads", set()),
     ("version", "tracking-protection-content-cryptomining", set()),
 )
@@ -351,26 +359,28 @@ def test_canonicalize(url, expected):
     assert l2s.canonicalize(url) == expected
 
 
-def _add_domain_to_list(domain, previous_domains, output):
+def _add_domain_to_list(domain, canonicalized_domain, previous_domain,
+                        output):
     """Auxiliary function for add_domain_to_list tests."""
-    canonicalized_domain = l2s.canonicalize(domain)
     domain_hash = hashlib.sha256(canonicalized_domain.encode("utf-8"))
 
     with patch("test_lists2safebrowsing.open", mock_open()):
         with open("test_blocklist.log", "w") as log_file:
-            added = l2s.add_domain_to_list(domain, previous_domains,
-                                           log_file, output)
+            added = l2s.add_domain_to_list(domain, canonicalized_domain,
+                                           previous_domain, log_file,
+                                           output)
             log_writes = log_file.write.call_args_list
 
-    return (added, canonicalized_domain, domain_hash, previous_domains,
-            log_writes, output)
+    return added, domain_hash, log_writes, output
 
 
 def test_add_domain_to_list():
     """Test adding a domain to a blocklist."""
     domain = "https://www.host.com"
-    (added, canonicalized_domain, domain_hash, previous_domains,
-     log_writes, output) = _add_domain_to_list(domain, set(), [])
+    canonicalized_domain = "www.host.com"
+    added, domain_hash, log_writes, output = (
+        _add_domain_to_list(domain, canonicalized_domain, None, [])
+    )
 
     expected_log_writes = [
         call("[m] %s >> %s\n" % (domain, canonicalized_domain)),
@@ -379,7 +389,6 @@ def test_add_domain_to_list():
     ]
 
     assert added
-    assert canonicalized_domain in previous_domains
     assert domain_hash.digest() in output
     assert log_writes == expected_log_writes
 
@@ -390,7 +399,7 @@ def test_add_domain_to_list_psl_public():
     add_domain_to_list raises a ValueError
     """
     with pytest.raises(ValueError):
-        _add_domain_to_list("https://co.uk", set(), [])
+        _add_domain_to_list("https://co.uk", "co.uk/", None, [])
 
 
 def test_add_domain_to_list_psl_private():
@@ -398,21 +407,23 @@ def test_add_domain_to_list_psl_private():
 
     add_domain_to_list adds them to the blocklist
     """
-    assert _add_domain_to_list("https://apps.fbsbx.com", set(), [])[0]
+    assert _add_domain_to_list("https://apps.fbsbx.com",
+                               "apps.fbsbx.com/", None, [])[0]
 
 
 def test_add_domain_to_list_duplicate():
     """Test that add_domain_to_list does not add domains twice."""
     domain = "https://duplicate.com"
-    (added, canonicalized_domain, domain_hash, previous_domains, _,
-     output) = _add_domain_to_list(domain, set(), [])
+    canonicalized_domain = "duplicate.com/"
+    added, domain_hash, _, output = (
+        _add_domain_to_list(domain, canonicalized_domain, None, [])
+    )
 
     assert added
-    assert canonicalized_domain in previous_domains
     assert domain_hash.digest() in output
 
-    added, _, _, _, log_writes, output = _add_domain_to_list(
-        domain, previous_domains, output)
+    added, _, log_writes, output = _add_domain_to_list(
+        domain, canonicalized_domain, canonicalized_domain, output)
 
     assert not added
     assert output == [domain_hash.digest()]
@@ -507,16 +518,17 @@ def test_get_domains_from_filters_tags(capsys, parser):
 
 def _write_safebrowsing_blocklist(chunknum, version, write_to_file=True):
     """Auxiliary function for write_safebrowsing_blocklist tests."""
-    domain = CANONICALIZE_TESTCASES[0]
+    # Include the dummytracker domain twice in the input set to make
+    # sure it is only added to the blocklist once
+    domains = {CANONICALIZE_TESTCASES[0][1], "https://www.google.com",
+               "example.com/", CANONICALIZE_TESTCASES[0][2]}
     output_name = "test-track-digest256"
 
     with patch("test_lists2safebrowsing.open", mock_open()):
         with open(output_name, "wb") as output_file:
             output_file = output_file if write_to_file else None
-            # Include the domain twice in the input set to make sure it
-            # is only added to the blocklist once
             l2s.write_safebrowsing_blocklist(
-                {domain[1], domain[2]}, output_name, None, chunknum,
+                domains, output_name, None, chunknum,
                 output_file, TEST_SECTION, version)
 
     return output_file.write.call_args_list if write_to_file else []
@@ -556,6 +568,7 @@ def test_write_safebrowsing_blocklist(capsys, chunknum, testcase,
     expected_print = PRINT_MSG % ("Tracking protection", TEST_SECTION,
                                   domains_number, file_size)
 
+    # Ensure hashes are written in correct order and without duplicates
     assert output_writes == [call(expected_output)]
     assert capsys.readouterr().out == expected_print
 
@@ -565,7 +578,7 @@ def test_write_safebrowsing_blocklist_no_output_file(capsys, chunknum):
     _write_safebrowsing_blocklist(chunknum, "78.0", False)
 
     expected_print = PRINT_MSG % ("Tracking protection", TEST_SECTION,
-                                  3, 115)
+                                  5, 180)
 
     assert capsys.readouterr().out == expected_print
 
@@ -583,13 +596,16 @@ def test_process_list(capsys, chunknum, log, list_type):
         print_id = "Entity list"
         domains_number = 5
     else:
-        incoming = [d[1] for d in CANONICALIZE_TESTCASES[:2]]
+        # Include the dummytracker domain twice in the input list to make
+        # sure it is only added to the blocklist once
+        incoming = [CANONICALIZE_TESTCASES[0][1], "https://www.google.com",
+                    "example.com/", CANONICALIZE_TESTCASES[0][2]]
         function = l2s.process_plugin_blocklist
         header, hashes = PROCESS_PLUGIN_BLOCKLIST_EXPECTED_OUTPUT_WRITES
         log_info = PROCESS_PLUGIN_BLOCKLIST_EXPECTED_LOG_WRITE_INFO
         log_id = "plugin-blocklist"
         print_id = "Plugin blocklist"
-        domains_number = 2
+        domains_number = 3
 
     with patch("test_lists2safebrowsing.open", mock_open()):
         with open("test-list.log", "w") as log_file:
@@ -611,6 +627,7 @@ def test_process_list(capsys, chunknum, log, list_type):
     # FIXME: os.fstat returns 0 size for the mocked file
     expected_print = PRINT_MSG % (print_id, TEST_SECTION, domains_number, 0)
 
+    # Ensure hashes are written in correct order and without duplicates
     assert output_writes == expected_output_writes
     assert log_writes == expected_log_writes
     assert capsys.readouterr().out == expected_print
@@ -671,7 +688,8 @@ def test_get_plugin_lists(config, chunknum):
     """Test creating a plugin blocklist from a configuration section."""
     section = "plugin-blocklist"
 
-    domains = [d[1] for d in CANONICALIZE_TESTCASES[:2]]
+    domains = [CANONICALIZE_TESTCASES[0][1], "https://www.google.com",
+               "example.com/", CANONICALIZE_TESTCASES[0][2]]
     # Add a comment line and a line with whitespace
     data = "\n".join(["# Comment", "    "] + domains)
 
@@ -684,11 +702,9 @@ def test_get_plugin_lists(config, chunknum):
                            call(output_filename + ".log", "w")]
 
     expected_hashes = PROCESS_PLUGIN_BLOCKLIST_EXPECTED_OUTPUT_WRITES[1]
-    # FIXME: Reversing the list of hashes will not be needed when
-    # alphanumerical ordering is enforced
     expected_output_writes = (
         [call(b"a:%d:32:%d\n" % (chunknum, len(expected_hashes) * 32))]
-        + [call(h) for h in reversed(expected_hashes)]
+        + [call(h) for h in expected_hashes]
     )
 
     assert urlopen_calls == expected_urlopen_calls
@@ -744,7 +760,7 @@ def test_get_tracker_lists(config, parser, chunknum, section, domains,
     if version:
         test_domains.append("%s-%s" % (version.replace(".", "-"),
                                        test_domains[0]))
-    expected_domains = test_domains + [l2s.canonicalize(d) for d in domains]
+    expected_domains = test_domains + sorted(domains)
     expected_hashes = [hashlib.sha256(d.encode("utf-8")).digest()
                        for d in expected_domains]
     expected_bytes = hashlib.sha256().digest_size * len(expected_hashes)
