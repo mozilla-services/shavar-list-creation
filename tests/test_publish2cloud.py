@@ -1,10 +1,10 @@
-import ConfigParser
+import configparser
 import os
+from unittest.mock import mock_open, patch
 
 import boto.s3.connection
 import boto.s3.key
 import pytest
-from mock import mock_open, patch
 from moto import mock_s3_deprecated as mock_s3
 
 from publish2cloud import (
@@ -14,11 +14,11 @@ from publish2cloud import (
 )
 
 
-TEST_CHUNKNUM = "0123456789"
-TEST_LIST = (b"a:%s:32:32\n" % TEST_CHUNKNUM
+TEST_CHUNKNUM = "1234567890"
+TEST_LIST = (b"a:%d:32:32\n" % int(TEST_CHUNKNUM)
              # Hash of test-track-digest256.dummytracker.org/
              + b"q\xd8Q\xbe\x8b#\xad\xd9\xde\xdf\xa7B\x12\xf0D\xa2\xf2"
-             "\x1d\xcfx\xeaHi\x7f8%\xb5\x99\x83\xc1\x111")
+             b"\x1d\xcfx\xeaHi\x7f8%\xb5\x99\x83\xc1\x111")
 
 TEST_LIST_CHECKSUM = ("043493ecb63c5f143a372a5118d04a44df188f238d2b18e6"
                       "cd848ae413a01090")
@@ -49,7 +49,7 @@ def s3(aws_credentials):
 
 @pytest.fixture
 def config():
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     config.add_section("main")
     config.add_section(TEST_CONFIG_SECTION)
     config.set("main", "s3_bucket", TEST_S3_BUCKET)
@@ -159,7 +159,7 @@ def _publish_to_s3(config):
 
     with patch("publish2cloud.boto.s3.key.Key.set_contents_from_filename",
                new=mock_set_contents_from_filename):
-        publish_to_s3(config, TEST_CONFIG_SECTION, TEST_CHUNKNUM)
+        publish_to_s3(config, TEST_CONFIG_SECTION, int(TEST_CHUNKNUM))
 
 
 def test_publish_to_s3(s3, config, capsys):

@@ -1,4 +1,4 @@
-import ConfigParser
+import configparser
 import hashlib
 import os
 import requests
@@ -22,7 +22,7 @@ from constants import (
 )
 from packaging import version as p_version
 
-CONFIG = ConfigParser.SafeConfigParser(os.environ)
+CONFIG = configparser.ConfigParser(os.environ)
 CONFIG.read(['shavar_list_creation.ini'])
 try:
     REMOTE_SETTINGS_URL = ''
@@ -46,7 +46,7 @@ try:
         )
     CLOUDFRONT_USER_ID = os.environ.get('CLOUDFRONT_USER_ID', None)
 
-except ConfigParser.NoOptionError as err:
+except configparser.NoOptionError as err:
     REMOTE_SETTINGS_URL = ''
     REMOTE_SETTINGS_AUTH = None
     REMOTE_SETTINGS_BUCKET = ''
@@ -56,7 +56,7 @@ except ConfigParser.NoOptionError as err:
 
 
 def chunk_metadata(fp):
-    header = fp.readline().rstrip('\n')
+    header = fp.readline().decode().rstrip('\n')
     chunktype, chunknum, hash_size, data_len = header.split(':')
     return dict(
         type=chunktype, num=chunknum, hash_size=hash_size, len=data_len,
@@ -92,7 +92,7 @@ def put_new_record_remote_settings(config, section, data):
 
     if not rec_resp:
         print('Failed to create/update record for %s. Error: %s' %
-              (data['Name'], rec_resp.content))
+              (data['Name'], rec_resp.content.decode()))
         return rec_resp
 
     attachment_url = record_url + '/attachment'

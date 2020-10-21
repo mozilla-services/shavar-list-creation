@@ -1,12 +1,10 @@
-boto==2.40.0
-publicsuffixlist==0.7.3
-requests==2.20.0
-trackingprotection_tools==0.4.6
-packaging==19.2
-setuptools==40.8.0
+boto==2.49.0
+publicsuffixlist==0.7.5
+requests==2.24.0
+trackingprotection-tools==0.6.1
+packaging==20.4
 
 # test requirements
-pytest==4.6.9
-pytest-cov==2.10.0
-mock==3.0.5
-moto==1.3.14
+pytest==6.1.1
+pytest-cov==2.10.1
+moto==1.3.16
