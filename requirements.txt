@@ -3,8 +3,3 @@ publicsuffixlist==0.7.5
 requests==2.24.0
 trackingprotection-tools==0.6.1
 packaging==20.4
-
-# test requirements
-pytest==6.1.1
-pytest-cov==2.10.1
-moto==1.3.16
