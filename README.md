@@ -26,7 +26,7 @@ generates safebrowsing-compatible digest list files to be served by
 2. Install required libraries:
 
     ```
-    pip install -r requirements.txt
+    pip install -r requirements-test.txt
     ```
 
 3. Copy the `sample_shavar_list_creation.ini` file to
