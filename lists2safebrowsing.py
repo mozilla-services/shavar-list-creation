@@ -51,7 +51,7 @@ def get_output_and_log_files(config, section):
     output_filename = config.get(section, "output")
     if output_filename:
         output_file = open(output_filename, "wb")
-        log_file = open(output_filename + ".log", "w")
+        # log_file = open(output_filename + ".log", "w")
     return output_file, log_file
 
 
