@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import ConfigParser
+import configparser
 import hashlib
 import json
 import os
@@ -8,7 +8,8 @@ import re
 import requests
 import sys
 import time
-import urllib2
+from urllib.parse import quote, unquote
+from urllib.request import urlopen
 
 from packaging import version as p_version
 from publicsuffixlist import PublicSuffixList
@@ -58,7 +59,7 @@ def get_list_url(config, section, key):
     """Return the requested list URL (or the default, if it isn't found)"""
     try:
         url = config.get(section, key)
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         url = config.get("main", "default_disconnect_url")
     return url
 
@@ -66,9 +67,9 @@ def get_list_url(config, section, key):
 def load_json_from_url(config, section, key):
     url = get_list_url(config, section, key)
     try:
-        loaded_json = json.loads(urllib2.urlopen(url).read())
-    except Exception:
-        sys.stderr.write("Error loading %s\n" % url)
+        loaded_json = json.loads(urlopen(url).read())
+    except Exception as e:
+        sys.stderr.write("Error loading %s: %s\n" % (url, repr(e)))
         sys.exit(-1)
     return loaded_json
 
@@ -91,7 +92,7 @@ def canonicalize(d):
     # repeatedly unescape until no more hex encodings
     while (1):
         _d = d
-        d = urllib2.unquote(_d)
+        d = unquote(_d)
         # if decoding had no effect, stop
         if (d == _d):
             break
@@ -142,34 +143,34 @@ def canonicalize(d):
     _url = ""
     for i in url:
         if (ord(i) <= 32 or ord(i) >= 127 or i == '#' or i == '%'):
-            _url += urllib2.quote(i)
+            _url += quote(i)
         else:
             _url += i
 
     return _url
 
 
-def add_domain_to_list(domain, previous_domains, log_file, output):
+def add_domain_to_list(domain, canonicalized_domain, previous_domain,
+                       log_file, output):
     """Prepare domain to be added to output list.
 
     Returns `True` if a domain was added, `False` otherwise"""
-    canon_d = canonicalize(domain)
-    if canon_d in previous_domains:
+    if canonicalized_domain == previous_domain:
         return False
     # Check if the domain is in the public (ICANN) section of the Public
     # Suffix List. See:
     # https://github.com/mozilla-services/shavar-list-creation/issues/102
     # SafeBrowsing keeps trailing '/', PublicSuffix does not
-    psl_d = canon_d.rstrip('/')
+    psl_d = canonicalized_domain.rstrip('/')
     if psl.publicsuffix(psl_d) == psl_d:
         raise ValueError("Domain '%s' is in the public section of the "
                          "Public Suffix List" % psl_d)
+    domain_hash = hashlib.sha256(canonicalized_domain.encode())
     if log_file:
-        log_file.write("[m] %s >> %s\n" % (domain, canon_d))
-        log_file.write("[canonicalized] %s\n" % (canon_d))
-        log_file.write("[hash] %s\n" % hashlib.sha256(canon_d).hexdigest())
-    previous_domains.add(canon_d)
-    output.append(hashlib.sha256(canon_d).digest())
+        log_file.write("[m] %s >> %s\n" % (domain, canonicalized_domain))
+        log_file.write("[canonicalized] %s\n" % (canonicalized_domain))
+        log_file.write("[hash] %s\n" % domain_hash.hexdigest())
+    output.append(domain_hash.digest())
     return True
 
 
@@ -202,16 +203,16 @@ def get_domains_from_filters(parser, category_filters,
     ----------
     parser : DisconnectParser
         An instance of the Disconnect list parser
-    category_filters : list of list of strings
+    category_filters : list of lists of strings
         A filter to restrict output to the specified top-level categories.
         Each filter should be a comma-separated list of top-level categories
         to restrict the list to. If more than one filter is provided, the
         intersection of the filters is returned.
         Example:
-            `[['Advertising', 'Analytics'], ['Fingerprinting']]` will return
-            domains in either the Advertising or Analytics category AND in the
-            Fingerprinting category.
-    category_exclusion_filters : list of list of strings, optional
+            `[['Advertising', 'Analytics'], ['FingerprintingInvasive']]`
+            will return domains in either the Advertising or Analytics
+            category AND in the FingerprintingInvasive category.
+    category_exclusion_filters : list of lists of strings, optional
         A filter to exclude domains from the specified top-level categories.
         The list format is the same as `category_filters`.
     dnt_filter : string, optional
@@ -282,48 +283,60 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     # Total number of bytes, 0 % 32
     hashdata_bytes = 0
 
-    # Remember previous domains so we don't print them more than once
-    previous_domains = set()
+    # Remember the previous domain so we don't print it more than once
+    previous_domain = None
 
-    # Array holding hash bytes to be written to f_out. We need the total bytes
-    # before writing anything.
+    # Array holding hash bytes to be written to output_file. We need the
+    # total bytes before writing anything
     output = []
 
     # Add a static test domain to list
     test_domain = TEST_DOMAIN_TEMPLATE % output_name
+    canonicalized_domain = canonicalize(test_domain)
     num_test_domain_added = 0
-    added = add_domain_to_list(test_domain, previous_domains, log_file, output)
+    added = add_domain_to_list(test_domain, canonicalized_domain,
+                               previous_domain, log_file, output)
     if added:
         num_test_domain_added += 1
+        previous_domain = canonicalized_domain
 
     if version:
         test_domain = '{0}-{1}'.format(version.replace('.', '-'), test_domain)
-        added = add_domain_to_list(
-            test_domain, previous_domains, log_file, output
-        )
+        canonicalized_domain = canonicalize(test_domain)
+        added = add_domain_to_list(test_domain, canonicalized_domain,
+                                   previous_domain, log_file, output)
         if added:
             num_test_domain_added += 1
+            previous_domain = canonicalized_domain
 
     if num_test_domain_added > 0:
         # TODO?: hashdata_bytes += hashdata.digest_size
         hashdata_bytes += (32 * num_test_domain_added)
         publishing += num_test_domain_added
 
-    for d in domains:
-        added = add_domain_to_list(d, previous_domains, log_file, output)
+    domains = [(d, canonicalize(d)) for d in domains]
+    # Sort the domains before writing their hashes to the safebrowsing
+    # list file to ensure that changes in the order of domains will not
+    # cause unnecessary updates
+    domains.sort(key=lambda d: d[1])
+    for domain, canonicalized_domain in domains:
+        added = add_domain_to_list(domain, canonicalized_domain,
+                                   previous_domain, log_file, output)
         if added:
             # TODO?: hashdata_bytes += hashdata.digest_size
             hashdata_bytes += 32
             publishing += 1
+            previous_domain = canonicalized_domain
 
     # Write safebrowsing-list format header
-    output_string = "a:%u:32:%s\n" % (chunk, hashdata_bytes)
-    output_string += ''.join(output)
+    output_bytes = b"a:%d:32:%d\n" % (chunk, hashdata_bytes)
+    output_bytes += b''.join(output)
+    # When testing on shavar-prod-lists no output file is provided
     if output_file:
-        output_file.write(output_string)
+        output_file.write(output_bytes)
 
-    print("Tracking protection(%s): publishing %d items; file size %d" % (
-        name, publishing, len(output_string)))
+    print("Tracking protection(%s): publishing %d items; file size %d" %
+          (name, publishing, len(output_bytes)))
     return
 
 
@@ -332,32 +345,30 @@ def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
     Expects a dict from a loaded JSON blob.
     """
     publishing = 0
-    urls = set()
     hashdata_bytes = 0
     output = []
+
     for name, entity in sorted(incoming.items()):
-        name = name.encode('utf-8')
+        urls = set()
         for prop in entity['properties']:
             for res in entity['resources']:
-                prop = prop.encode('utf-8')
-                res = res.encode('utf-8')
                 if prop == res:
                     continue
-                d = canonicalize('%s/?resource=%s' % (prop, res))
-                h = hashlib.sha256(d)
-                if log_file:
-                    log_file.write(
-                        "[entity] %s >> (canonicalized) %s, hash %s\n"
-                        % (name, d, h.hexdigest())
-                    )
-                urls.add(d)
-                publishing += 1
-                hashdata_bytes += 32
-                output.append(hashlib.sha256(d).digest())
+                urls.add(canonicalize('%s/?resource=%s' % (prop, res)))
+        urls = sorted(urls)
+        for url in urls:
+            h = hashlib.sha256(url.encode())
+            if log_file:
+                log_file.write(
+                    "[entity] %s >> (canonicalized) %s, hash %s\n"
+                    % (name, url, h.hexdigest())
+                )
+            publishing += 1
+            hashdata_bytes += 32
+            output.append(h.digest())
 
     # Write the data file
-    output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
-    # FIXME: we should really sort the output
+    output_file.write(b"a:%d:32:%d\n" % (chunk, hashdata_bytes))
     for o in output:
         output_file.write(o)
 
@@ -370,25 +381,27 @@ def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
 def process_plugin_blocklist(incoming, chunk, output_file, log_file,
                              list_variant):
     publishing = 0
-    domains = set()
     hashdata_bytes = 0
+    previous_domain = None
     output = []
-    for d in incoming:
-        canon_d = canonicalize(d.encode('utf-8'))
-        if canon_d not in domains:
-            h = hashlib.sha256(canon_d)
+
+    domains = [(d, canonicalize(d)) for d in incoming]
+    domains.sort(key=lambda d: d[1])
+    for domain, canonicalized_domain in domains:
+        if canonicalized_domain != previous_domain:
+            h = hashlib.sha256(canonicalized_domain.encode())
             if log_file:
                 log_file.write(
                     "[plugin-blocklist] %s >> (canonicalized) %s, hash %s\n"
-                    % (d, canon_d, h.hexdigest())
+                    % (domain, canonicalized_domain, h.hexdigest())
                 )
             publishing += 1
-            domains.add(canon_d)
             hashdata_bytes += 32
-            output.append(hashlib.sha256(canon_d).digest())
+            previous_domain = canonicalized_domain
+            output.append(h.digest())
+
     # Write the data file
-    output_file.write("a:%u:32:%s\n" % (chunk, hashdata_bytes))
-    # FIXME: we should really sort the output
+    output_file.write(b"a:%d:32:%d\n" % (chunk, hashdata_bytes))
     for o in output:
         output_file.write(o)
 
@@ -436,7 +449,7 @@ def get_tracker_lists(config, section, chunknum):
                 "Supported tags: %s\nConfig file tags: %s" %
                 (ALL_TAGS, desired_tags)
             )
-    except ConfigParser.NoOptionError:
+    except configparser.NoOptionError:
         desired_tags = DEFAULT_DISCONNECT_LIST_TAGS
 
     # Retrieve domains that match filters
@@ -491,6 +504,29 @@ def get_entity_lists(config, section, chunknum):
     return output_file, log_file
 
 
+def get_plugin_lists(config, section, chunknum):
+    # load the plugin blocklist
+    blocked = set()
+    blocklist_url = config.get(section, "blocklist")
+    if not blocklist_url:
+        raise ValueError("The 'blocklist' key in section '%s' of the "
+                         "configuration file is empty. A plugin "
+                         "blocklist URL must be specified." % section)
+
+    for line in urlopen(blocklist_url).readlines():
+        line = line.decode().strip()
+        # don't add blank lines or comments
+        if not line or line.startswith('#'):
+            continue
+        blocked.add(line)
+
+    output_file, log_file = get_output_and_log_files(config, section)
+    process_plugin_blocklist(blocked, chunknum, output_file, log_file,
+                             section)
+
+    return output_file, log_file
+
+
 def edit_config(config, section, option, old_value, new_value):
     current = config.get(section, option)
     edited_config = current.replace(old_value, new_value)
@@ -527,7 +563,7 @@ def version_configurations(config, section, version, revert=False):
         new_source_url = initial_source_url_value
         old_s3_key = versioned_key
         new_s3_key = initial_s3_key_value
-        ver_val = None
+        ver_val = ""
 
     # change the config
     if config.has_option(section, source_url):
@@ -559,7 +595,7 @@ def revert_config(config, version):
 
 def get_versioned_lists(config, chunknum, version):
     """
-    Checks `versioning_needed` in each sections then versions the tracker lists
+    Checks `versioning_needed` in each section then versions the tracker lists
     by overwriting the existing SafeBrowsing formatted files.
     """
     edit_config(
@@ -618,7 +654,7 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
 
 
 def main():
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     filename = config.read(["shavar_list_creation.ini"])
     if not filename:
         sys.stderr.write("Error loading shavar_list_creation.ini\n")
@@ -635,20 +671,7 @@ def main():
                 config, section, chunknum)
 
         if section in PLUGIN_SECTIONS:
-            # load the plugin blocklist
-            blocked = set()
-            blocklist_url = config.get(section, "blocklist")
-            if blocklist_url:
-                for line in urllib2.urlopen(blocklist_url).readlines():
-                    line = line.strip()
-                    # don't add blank lines or comments
-                    if not line or line.startswith('#'):
-                        continue
-                    blocked.add(line)
-
-            output_file, log_file = get_output_and_log_files(config, section)
-            process_plugin_blocklist(blocked, chunknum, output_file, log_file,
-                                     section)
+            output_file, log_file = get_plugin_lists(config, section, chunknum)
 
         if section in ENTITYLIST_SECTIONS:
             output_file, log_file = get_entity_lists(config, section, chunknum)

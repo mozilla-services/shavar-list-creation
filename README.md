@@ -11,7 +11,7 @@ generates safebrowsing-compatible digest list files to be served by
 
 # Requirements
 
-* python 2.x
+* python &geq; 3.6
 * (optional) virtualenv and/or virtualenvwrapper
 
 # Run
@@ -19,14 +19,14 @@ generates safebrowsing-compatible digest list files to be served by
 1. (optional) Make a virtualenv for the project and activate it:
 
     ```
-    virtualenv shavar-list-creation
+    virtualenv -p python3.8 shavar-list-creation
     source shavar-list-creation/bin/activate
     ```
 
 2. Install required libraries:
 
     ```
-    pip install -r requirements.txt
+    pip install -r requirements-test.txt
     ```
 
 3. Copy the `sample_shavar_list_creation.ini` file to
