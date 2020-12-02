@@ -413,30 +413,12 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
         list_variant, publishing, output_size))
 
 
-def get_data_from_list(
-        config, section, parser, blocked_domains, list_name=None):
+def get_json_list(config, section, parser, blocked_domains):
     companies = set()
-    if list_name == config.get(section, 'output'):
-        domain_msg = '/// DOMAINS BLOCKED IN {0}: {1}'
-        print(domain_msg.format(list_name, len(blocked_domains)))
-        domains_file = open('domains-blocked', "wb")
-        for domain in blocked_domains:
-            domains_file.write('{},'.format(domain))
-        domains_file.close()
-
-        for domain in blocked_domains:
-            if domain in parser._company_classifier.keys():
-                companies.update([parser._company_classifier[domain]])
-            else:
-                msg = '!!! Domain {} not from the list has been blocked !!!'
-                print(msg.format(domain))
-        company_msg = '/// COMPANIES BLOCKED IN {0}: {1}'
-        print(company_msg.format(list_name, len(companies)))
-        companies_file = open('companies-blocked', "wb")
-        for comp in companies:
-            unicode_str = comp.encode('utf8')
-            companies_file.write('{},'.format(unicode_str))
-        companies_file.close()
+    list_name = config.get(section, 'output')
+    json_file = open(list_name + '.json', "w")
+    json.dump(blocked_domains, json_file, indent=2)
+    json_file.close()
 
 
 def get_tracker_lists(config, section, chunknum):
@@ -486,19 +468,18 @@ def get_tracker_lists(config, section, chunknum):
     blocked_domains = get_domains_from_filters(
         parser, list_categories, excluded_categories,
         which_dnt, desired_tags)
-    # Defaults to None if no list name is specfied
-    get_data_from_list(
-        config, section, parser, blocked_domains)
 
     output_file, log_file = get_output_and_log_files(config, section)
     # Write blocklist in a format compatible with safe browsing
     output_filename = config.get(section, "output")
     version = (config.has_option(section, "version")
                and config.get(section, "version"))
-    write_safebrowsing_blocklist(
+    sorted_domains = write_safebrowsing_blocklist(
         blocked_domains, output_filename, log_file, chunknum,
         output_file, section, version
     )
+    get_json_list(
+        config, section, parser, sorted_domains)
     return output_file, log_file
 
 
