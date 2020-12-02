@@ -319,6 +319,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     # list file to ensure that changes in the order of domains will not
     # cause unnecessary updates
     domains.sort(key=lambda d: d[1])
+    added_domains = []
     for domain, canonicalized_domain in domains:
         added = add_domain_to_list(domain, canonicalized_domain,
                                    previous_domain, log_file, output)
@@ -327,6 +328,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
             hashdata_bytes += 32
             publishing += 1
             previous_domain = canonicalized_domain
+            added_domains.append(domain)
 
     # Write safebrowsing-list format header
     output_bytes = b"a:%d:32:%d\n" % (chunk, hashdata_bytes)
@@ -337,7 +339,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
 
     print("Tracking protection(%s): publishing %d items; file size %d" %
           (name, publishing, len(output_bytes)))
-    return
+    return added_domains
 
 
 def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
