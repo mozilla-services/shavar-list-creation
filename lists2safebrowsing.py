@@ -29,7 +29,7 @@ from constants import (
     STANDARD_ENTITY_SECTION,
     TEST_DOMAIN_TEMPLATE,
     VERS_LARGE_ENTITIES_SEPARATION_STARTED,
-    WHITELIST_SECTIONS,
+    ENTITYLIST_SECTIONS,
 )
 from publish2cloud import (
     publish_to_cloud
@@ -67,8 +67,8 @@ def load_json_from_url(config, section, key):
     url = get_list_url(config, section, key)
     try:
         loaded_json = json.loads(urllib2.urlopen(url).read())
-    except Exception:
-        sys.stderr.write("Error loading %s\n" % url)
+    except Exception as e:
+        sys.stderr.write("Error loading %s: %s\n" % (url, repr(e)))
         sys.exit(-1)
     return loaded_json
 
@@ -202,16 +202,16 @@ def get_domains_from_filters(parser, category_filters,
     ----------
     parser : DisconnectParser
         An instance of the Disconnect list parser
-    category_filters : list of list of strings
+    category_filters : list of lists of strings
         A filter to restrict output to the specified top-level categories.
         Each filter should be a comma-separated list of top-level categories
         to restrict the list to. If more than one filter is provided, the
         intersection of the filters is returned.
         Example:
-            `[['Advertising', 'Analytics'], ['Fingerprinting']]` will return
-            domains in either the Advertising or Analytics category AND in the
-            Fingerprinting category.
-    category_exclusion_filters : list of list of strings, optional
+            `[['Advertising', 'Analytics'], ['FingerprintingInvasive']]`
+            will return domains in either the Advertising or Analytics
+            category AND in the FingerprintingInvasive category.
+    category_exclusion_filters : list of lists of strings, optional
         A filter to exclude domains from the specified top-level categories.
         The list format is the same as `category_filters`.
     dnt_filter : string, optional
@@ -319,6 +319,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     # Write safebrowsing-list format header
     output_string = "a:%u:32:%s\n" % (chunk, hashdata_bytes)
     output_string += ''.join(output)
+    # When testing on shavar-prod-lists no output file is provided
     if output_file:
         output_file.write(output_string)
 
@@ -327,8 +328,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     return
 
 
-def process_entity_whitelist(incoming, chunk, output_file,
-                             log_file, list_variant):
+def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
     """
     Expects a dict from a loaded JSON blob.
     """
@@ -364,8 +364,8 @@ def process_entity_whitelist(incoming, chunk, output_file,
 
     output_file.flush()
     output_size = os.fstat(output_file.fileno()).st_size
-    print("Entity whitelist(%s): publishing %d items; file size %d" % (
-        list_variant, publishing, output_size))
+    print("Entity list(%s): publishing %d items; file size %d"
+          % (list_variant, publishing, output_size))
 
 
 def process_plugin_blocklist(incoming, chunk, output_file, log_file,
@@ -397,6 +397,32 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
     output_size = os.fstat(output_file.fileno()).st_size
     print("Plugin blocklist(%s): publishing %d items; file size %d" % (
         list_variant, publishing, output_size))
+
+
+def get_data_from_list(
+        config, section, parser, blocked_domains, list_name=None):
+    companies = set()
+    if list_name == config.get(section, 'output'):
+        domain_msg = '/// DOMAINS BLOCKED IN {0}: {1}'
+        print(domain_msg.format(list_name, len(blocked_domains)))
+        domains_file = open('domains-blocked', "wb")
+        for domain in blocked_domains:
+            domains_file.write('{},'.format(domain))
+        domains_file.close()
+
+        for domain in blocked_domains:
+            if domain in parser._company_classifier.keys():
+                companies.update([parser._company_classifier[domain]])
+            else:
+                msg = '!!! Domain {} not from the list has been blocked !!!'
+                print(msg.format(domain))
+        company_msg = '/// COMPANIES BLOCKED IN {0}: {1}'
+        print(company_msg.format(list_name, len(companies)))
+        companies_file = open('companies-blocked', "wb")
+        for comp in companies:
+            unicode_str = comp.encode('utf8')
+            companies_file.write('{},'.format(unicode_str))
+        companies_file.close()
 
 
 def get_tracker_lists(config, section, chunknum):
@@ -446,6 +472,9 @@ def get_tracker_lists(config, section, chunknum):
     blocked_domains = get_domains_from_filters(
         parser, list_categories, excluded_categories,
         which_dnt, desired_tags)
+    # Defaults to None if no list name is specfied
+    get_data_from_list(
+        config, section, parser, blocked_domains)
 
     output_file, log_file = get_output_and_log_files(config, section)
     # Write blocklist in a format compatible with safe browsing
@@ -474,19 +503,44 @@ def get_entity_lists(config, section, chunknum):
     )
     output_file, log_file = get_output_and_log_files(config, section)
 
-    # download and load the business entity oriented whitelist
-    whitelist = load_json_from_url(config, section, "entity_url")
+    # download and load the business entity oriented list
+    entitylist = load_json_from_url(
+        config, section, "entity_url"
+    ).pop('entities')
 
     if channel_needs_separation and list_needs_separation:
         google_entitylist = {}
-        google_entitylist['Google'] = whitelist.pop('Google')
+        google_entitylist['Google'] = entitylist.pop('Google')
 
     if section in LARGE_ENTITIES_SECTIONS:
-        process_entity_whitelist(google_entitylist, chunknum,
-                                 output_file, log_file, section)
+        process_entitylist(google_entitylist, chunknum,
+                           output_file, log_file, section)
     else:
-        process_entity_whitelist(whitelist, chunknum, output_file,
-                                 log_file, section)
+        process_entitylist(entitylist, chunknum, output_file,
+                           log_file, section)
+    return output_file, log_file
+
+
+def get_plugin_lists(config, section, chunknum):
+    # load the plugin blocklist
+    blocked = set()
+    blocklist_url = config.get(section, "blocklist")
+    if not blocklist_url:
+        raise ValueError("The 'blocklist' key in section '%s' of the "
+                         "configuration file is empty. A plugin "
+                         "blocklist URL must be specified." % section)
+
+    for line in urllib2.urlopen(blocklist_url).readlines():
+        line = line.strip()
+        # don't add blank lines or comments
+        if not line or line.startswith('#'):
+            continue
+        blocked.add(line)
+
+    output_file, log_file = get_output_and_log_files(config, section)
+    process_plugin_blocklist(blocked, chunknum, output_file, log_file,
+                             section)
+
     return output_file, log_file
 
 
@@ -511,7 +565,7 @@ def version_configurations(config, section, version, revert=False):
         source_url = 'disconnect_url'
         versioned_key = 'tracking/{ver}/'.format(ver=version)
 
-    if section in WHITELIST_SECTIONS:
+    if section in ENTITYLIST_SECTIONS:
         initial_s3_key_value = 'entity/'
         source_url = 'entity_url'
         versioned_key = 'entity/{ver}/'.format(ver=version)
@@ -581,7 +635,7 @@ def get_versioned_lists(config, chunknum, version):
             output_file, log_file = get_tracker_lists(
                 config, section, chunknum)
 
-        if section in WHITELIST_SECTIONS:
+        if section in ENTITYLIST_SECTIONS:
             ver = p_version.parse(version)
             skip_large_entity_separation = (
                 ver.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
@@ -634,22 +688,9 @@ def main():
                 config, section, chunknum)
 
         if section in PLUGIN_SECTIONS:
-            # load the plugin blocklist
-            blocked = set()
-            blocklist_url = config.get(section, "blocklist")
-            if blocklist_url:
-                for line in urllib2.urlopen(blocklist_url).readlines():
-                    line = line.strip()
-                    # don't add blank lines or comments
-                    if not line or line.startswith('#'):
-                        continue
-                    blocked.add(line)
+            output_file, log_file = get_plugin_lists(config, section, chunknum)
 
-            output_file, log_file = get_output_and_log_files(config, section)
-            process_plugin_blocklist(blocked, chunknum, output_file, log_file,
-                                     section)
-
-        if section in WHITELIST_SECTIONS:
+        if section in ENTITYLIST_SECTIONS:
             output_file, log_file = get_entity_lists(config, section, chunknum)
 
     if output_file:

@@ -1,7 +1,8 @@
 shavar-list-creation
 ====================
 
-[![Build Status](https://circleci.com/gh/mozilla-services/shavar-list-creation.svg?style=shield)](https://circleci.com/gh/mozilla-services/shavar-list-creation)
+[![Build Status](https://circleci.com/gh/mozilla-services/shavar-list-creation/tree/main.svg?style=shield)](https://circleci.com/gh/mozilla-services/shavar-list-creation/tree/main)
+[![Coverage](https://circleci.com/api/v1.1/project/github/mozilla-services/shavar-list-creation/latest/artifacts/0/coverage.svg?branch=main)](https://circleci.com/api/v1.1/project/github/mozilla-services/shavar-list-creation/latest/artifacts/0/htmlcov/index.html?branch=main)
 
 This script fetches blocklist `.json` from urls (such as
 [shavar-prod-lists](https://github.com/mozilla-services/shavar-prod-lists)) and
@@ -28,17 +29,17 @@ generates safebrowsing-compatible digest list files to be served by
     pip install -r requirements.txt
     ```
 
-3. Run the unit tests (currently under development):
-
-    ```
-    python -m pytest -v
-    ```
-
-4. Copy the `sample_shavar_list_creation.ini` file to
+3. Copy the `sample_shavar_list_creation.ini` file to
    `shavar_list_creation.ini`:
 
     ```
     cp sample_shavar_list_creation.ini shavar_list_creation.ini
+    ```
+
+4. Run the unit tests (currently under development):
+
+    ```
+    python -m pytest -v --cov=. --cov-branch
     ```
 
 5. Run the `lists2safebrowsing.py` script:

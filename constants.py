@@ -9,7 +9,7 @@ PLUGIN_SECTIONS = (
     "flash-subdoc-exceptions",
     "flashinfobar-exceptions"
 )
-WHITELIST_SECTIONS = (
+ENTITYLIST_SECTIONS = (
     "entity-whitelist",
     "entity-whitelist-testing",
     "staging-entity-whitelist",
@@ -76,13 +76,9 @@ LARGE_ENTITIES_SECTIONS = {
 STANDARD_ENTITY_SECTION = 'entity-whitelist'
 
 
-FINGERPRINTING_TAG = 'fingerprinting'
-CRYPTOMINING_TAG = 'cryptominer'
 SESSION_REPLAY_TAG = 'session-replay'
 PERFORMANCE_TAG = 'performance'
 ALL_TAGS = {
-    FINGERPRINTING_TAG,
-    CRYPTOMINING_TAG,
     SESSION_REPLAY_TAG,
     PERFORMANCE_TAG
 }
