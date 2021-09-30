@@ -416,6 +416,8 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
 def get_json_list(config, section, parser, blocked_domains):
     companies = set()
     list_name = config.get(section, 'output')
+    if config.has_option(section, 'version'):
+        list_name = '{}-{}'.format(config.get(section, 'version'), list_name)
     json_file = open(list_name + '.json', "w")
     json.dump(blocked_domains, json_file, indent=2)
     json_file.close()
@@ -667,7 +669,7 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
 
 def main():
     config = configparser.ConfigParser()
-    filename = config.read(["shavar_list_creation.ini"])
+    filename = config.read(["shavar_list_creat_latest_prod.ini"])
     if not filename:
         sys.stderr.write("Error loading shavar_list_creation.ini\n")
         sys.exit(-1)
