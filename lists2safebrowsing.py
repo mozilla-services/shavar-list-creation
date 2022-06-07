@@ -41,7 +41,7 @@ psl = PublicSuffixList(only_icann=True)
 
 GITHUB_API_URL = 'https://api.github.com'
 SHAVAR_PROD_LISTS_BRANCHES_PATH = (
-    '/repos/mozilla-services/shavar-prod-lists/branches'
+    '/repos/mozilla-services/shavar-prod-lists/branches?per_page=100'
 )
 
 
