@@ -29,6 +29,7 @@ from constants import (
     LARGE_ENTITIES_SECTIONS,
     STANDARD_ENTITY_SECTION,
     TEST_DOMAIN_TEMPLATE,
+    VERSION_EMAIL_CATEGORY_INTRODUCED,
     VERS_LARGE_ENTITIES_SEPARATION_STARTED,
     ENTITYLIST_SECTIONS,
 )
@@ -614,12 +615,14 @@ def get_versioned_lists(config, chunknum, version):
             ver=version, output=config.get(section, 'output'))
         )
         version_configurations(config, section, version)
+        ver = p_version.parse(version)
         if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
+            if ver.release[0] < VERSION_EMAIL_CATEGORY_INTRODUCED:
+                continue
             output_file, log_file = get_tracker_lists(
                 config, section, chunknum)
 
         if section in ENTITYLIST_SECTIONS:
-            ver = p_version.parse(version)
             skip_large_entity_separation = (
                 ver.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
                 and section in LARGE_ENTITIES_SECTIONS

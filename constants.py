@@ -51,7 +51,10 @@ DNT_SECTIONS = (
     "tracking-protection-content-fingerprinting",
     "tracking-protection-base-cryptomining",
     "tracking-protection-content-cryptomining",
-    "tracking-protection-test-multitag"
+    "tracking-protection-test-multitag",
+    # email trackers added in 2022
+    "tracking-protection-email-content",
+    "tracking-protection-email-base",
 )
 DNT_CONTENT_SECTIONS = (
     "tracking-protection-content",
@@ -97,3 +100,4 @@ LARGE_ENTITIES = [
 ]
 
 VERS_LARGE_ENTITIES_SEPARATION_STARTED = 74
+VERSION_EMAIL_CATEGORY_INTRODUCED = 97
