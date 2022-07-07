@@ -22,6 +22,7 @@ from constants import (
     DEFAULT_DISCONNECT_LIST_CATEGORIES,
     DEFAULT_DISCONNECT_LIST_TAGS,
     DNT_EFF_SECTIONS,
+    DNT_EMAIL_SECTIONS,
     DNT_SECTIONS,
     DNT_W3C_SECTIONS,
     PLUGIN_SECTIONS,
@@ -617,7 +618,12 @@ def get_versioned_lists(config, chunknum, version):
         version_configurations(config, section, version)
         ver = p_version.parse(version)
         if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
-            if ver.release[0] < VERSION_EMAIL_CATEGORY_INTRODUCED:
+            skip_section = (
+                section in DNT_EMAIL_SECTIONS
+                and ver.release[0] < VERSION_EMAIL_CATEGORY_INTRODUCED
+            )
+            if skip_section:
+                # import ipdb; ipdb.set_trace()
                 continue
             output_file, log_file = get_tracker_lists(
                 config, section, chunknum)

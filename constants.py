@@ -56,6 +56,10 @@ DNT_SECTIONS = (
     "tracking-protection-email-content",
     "tracking-protection-email-base",
 )
+DNT_EMAIL_SECTIONS = (
+    "tracking-protection-email-content",
+    "tracking-protection-email-base",
+)
 DNT_CONTENT_SECTIONS = (
     "tracking-protection-content",
     "tracking-protection-contenteff",
