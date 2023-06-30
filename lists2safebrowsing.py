@@ -505,6 +505,7 @@ def get_entity_lists(config, section, chunknum):
     entitylist = load_json_from_url(
         config, section, "entity_url"
     ).pop('entities')
+    get_json_list(config, section, entitylist)
 
     if channel_needs_separation and list_needs_separation:
         google_entitylist = {}
