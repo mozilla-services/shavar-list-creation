@@ -677,7 +677,7 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
 
 def main():
     config = configparser.ConfigParser()
-    filename = config.read(["shavar_list_creat_latest_prod.ini"])
+    filename = config.read(["shavar_list_creation.ini"])
     if not filename:
         sys.stderr.write("Error loading shavar_list_creation.ini\n")
         sys.exit(-1)
