@@ -415,13 +415,13 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
         list_variant, publishing, output_size))
 
 
-def get_json_list(config, section, parser, blocked_domains):
+def get_json_list(config, section, domains):
     companies = set()
     list_name = config.get(section, 'output')
     if config.has_option(section, 'version'):
         list_name = '{}-{}'.format(config.get(section, 'version'), list_name)
     json_file = open(list_name + '.json', "w")
-    json.dump(blocked_domains, json_file, indent=2)
+    json.dump(domains, json_file, indent=2)
     json_file.close()
 
 
@@ -482,8 +482,7 @@ def get_tracker_lists(config, section, chunknum):
         blocked_domains, output_filename, log_file, chunknum,
         output_file, section, version
     )
-    get_json_list(
-        config, section, parser, sorted_domains)
+    get_json_list(config, section, sorted_domains)
     return output_file, log_file
 
 
