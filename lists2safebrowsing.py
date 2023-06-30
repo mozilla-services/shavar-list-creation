@@ -22,6 +22,7 @@ from constants import (
     DEFAULT_DISCONNECT_LIST_CATEGORIES,
     DEFAULT_DISCONNECT_LIST_TAGS,
     DNT_EFF_SECTIONS,
+    DNT_EMAIL_SECTIONS,
     DNT_SECTIONS,
     DNT_W3C_SECTIONS,
     PLUGIN_SECTIONS,
@@ -29,6 +30,7 @@ from constants import (
     LARGE_ENTITIES_SECTIONS,
     STANDARD_ENTITY_SECTION,
     TEST_DOMAIN_TEMPLATE,
+    VERSION_EMAIL_CATEGORY_INTRODUCED,
     VERS_LARGE_ENTITIES_SEPARATION_STARTED,
     ENTITYLIST_SECTIONS,
 )
@@ -41,7 +43,7 @@ psl = PublicSuffixList(only_icann=True)
 
 GITHUB_API_URL = 'https://api.github.com'
 SHAVAR_PROD_LISTS_BRANCHES_PATH = (
-    '/repos/mozilla-services/shavar-prod-lists/branches'
+    '/repos/mozilla-services/shavar-prod-lists/branches?per_page=100'
 )
 
 
@@ -628,12 +630,19 @@ def get_versioned_lists(config, chunknum, version):
             ver=version, output=config.get(section, 'output'))
         )
         version_configurations(config, section, version)
+        ver = p_version.parse(version)
         if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
+            skip_section = (
+                section in DNT_EMAIL_SECTIONS
+                and ver.release[0] < VERSION_EMAIL_CATEGORY_INTRODUCED
+            )
+            if skip_section:
+                # import ipdb; ipdb.set_trace()
+                continue
             output_file, log_file = get_tracker_lists(
                 config, section, chunknum)
 
         if section in ENTITYLIST_SECTIONS:
-            ver = p_version.parse(version)
             skip_large_entity_separation = (
                 ver.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
                 and section in LARGE_ENTITIES_SECTIONS
