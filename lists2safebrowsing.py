@@ -636,7 +636,6 @@ def get_versioned_lists(config, chunknum, version):
                 and ver.release[0] < VERSION_EMAIL_CATEGORY_INTRODUCED
             )
             if skip_section:
-                # import ipdb; ipdb.set_trace()
                 continue
             output_file, log_file = get_tracker_lists(
                 config, section, chunknum)
@@ -666,7 +665,7 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
             )
             get_versioned_lists(config, chunknum, version=branch_name)
             print('\n*** Publish Versioned Lists ***')
-            # publish_to_cloud(config, chunknum, check_versioning=True)
+            publish_to_cloud(config, chunknum, check_versioning=True)
             print('\n*** Revert Configs ***')
             revert_config(config, branch_name)
         else:
@@ -703,7 +702,7 @@ def main():
     if log_file:
         log_file.close()
 
-    # publish_to_cloud(config, chunknum)
+    publish_to_cloud(config, chunknum)
 
     # create and publish versioned lists
     resp = requests.get(GITHUB_API_URL + SHAVAR_PROD_LISTS_BRANCHES_PATH)
