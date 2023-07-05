@@ -212,10 +212,19 @@ def publish_to_s3(config, section, chunknum):
         k.set_acl('bucket-owner-full-control')
         if CLOUDFRONT_USER_ID is not None:
             k.add_user_grant('READ', CLOUDFRONT_USER_ID)
+
+    # upload JSON files to support iOS ETP
+    for key_name in (chunk_key, key):
+        k = boto.s3.key.Key(bucket)
+        k.key = key_name
+        k.set_contents_from_filename(f"{output_filename}.json")
+        k.set_acl('bucket-owner-full-control')
+        if CLOUDFRONT_USER_ID is not None:
+            k.add_user_grant('READ', CLOUDFRONT_USER_ID)
     print('Uploaded to s3: %s' % section)
 
 
-def publish_to_remote_settings(config, section):
+def publish_to_remote_settings(config, section, chunknum):
     list_type = ''
     categories = []
     excluded_categories = []
@@ -248,7 +257,8 @@ def publish_to_remote_settings(config, section):
         'ExcludedCategories': excluded_categories,
         'Type': list_type,
         'Name': list_name,
-        'Checksum': chunk_file['checksum']
+        'Checksum': chunk_file['checksum'],
+        'Version': chunknum,
     }
     put_new_record_remote_settings(config, section, record_data)
     print('Uploaded to remote settings: %s' % list_name)
@@ -314,6 +324,6 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
             print('Skipping S3 upload for %s' % section)
 
         if rs_upload_needed and upload_to_remote_setting:
-            publish_to_remote_settings(config, section)
+            publish_to_remote_settings(config, section, chunknum)
         else:
             print('Skipping Remote Settings upload for %s' % section)

@@ -22,6 +22,7 @@ from constants import (
     DEFAULT_DISCONNECT_LIST_CATEGORIES,
     DEFAULT_DISCONNECT_LIST_TAGS,
     DNT_EFF_SECTIONS,
+    DNT_EMAIL_SECTIONS,
     DNT_SECTIONS,
     DNT_W3C_SECTIONS,
     PLUGIN_SECTIONS,
@@ -29,6 +30,7 @@ from constants import (
     LARGE_ENTITIES_SECTIONS,
     STANDARD_ENTITY_SECTION,
     TEST_DOMAIN_TEMPLATE,
+    VERSION_EMAIL_CATEGORY_INTRODUCED,
     VERS_LARGE_ENTITIES_SEPARATION_STARTED,
     ENTITYLIST_SECTIONS,
 )
@@ -41,7 +43,7 @@ psl = PublicSuffixList(only_icann=True)
 
 GITHUB_API_URL = 'https://api.github.com'
 SHAVAR_PROD_LISTS_BRANCHES_PATH = (
-    '/repos/mozilla-services/shavar-prod-lists/branches'
+    '/repos/mozilla-services/shavar-prod-lists/branches?per_page=100'
 )
 
 
@@ -319,6 +321,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     # list file to ensure that changes in the order of domains will not
     # cause unnecessary updates
     domains.sort(key=lambda d: d[1])
+    added_domains = []
     for domain, canonicalized_domain in domains:
         added = add_domain_to_list(domain, canonicalized_domain,
                                    previous_domain, log_file, output)
@@ -327,6 +330,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
             hashdata_bytes += 32
             publishing += 1
             previous_domain = canonicalized_domain
+            added_domains.append(domain)
 
     # Write safebrowsing-list format header
     output_bytes = b"a:%d:32:%d\n" % (chunk, hashdata_bytes)
@@ -337,7 +341,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
 
     print("Tracking protection(%s): publishing %d items; file size %d" %
           (name, publishing, len(output_bytes)))
-    return
+    return added_domains
 
 
 def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
@@ -411,6 +415,16 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
         list_variant, publishing, output_size))
 
 
+def get_json_list(config, section, domains):
+    companies = set()
+    list_name = config.get(section, 'output')
+    if config.has_option(section, 'version'):
+        list_name = '{}-{}'.format(config.get(section, 'version'), list_name)
+    json_file = open(list_name + '.json', "w")
+    json.dump(domains, json_file, indent=2)
+    json_file.close()
+
+
 def get_tracker_lists(config, section, chunknum):
     blocklist_url = get_list_url(config, section, "disconnect_url")
     parser = DisconnectParser(blocklist_url=blocklist_url)
@@ -464,10 +478,11 @@ def get_tracker_lists(config, section, chunknum):
     output_filename = config.get(section, "output")
     version = (config.has_option(section, "version")
                and config.get(section, "version"))
-    write_safebrowsing_blocklist(
+    sorted_domains = write_safebrowsing_blocklist(
         blocked_domains, output_filename, log_file, chunknum,
         output_file, section, version
     )
+    get_json_list(config, section, sorted_domains)
     return output_file, log_file
 
 
@@ -490,6 +505,7 @@ def get_entity_lists(config, section, chunknum):
     entitylist = load_json_from_url(
         config, section, "entity_url"
     ).pop('entities')
+    get_json_list(config, section, entitylist)
 
     if channel_needs_separation and list_needs_separation:
         google_entitylist = {}
@@ -614,12 +630,18 @@ def get_versioned_lists(config, chunknum, version):
             ver=version, output=config.get(section, 'output'))
         )
         version_configurations(config, section, version)
+        ver = p_version.parse(version)
         if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
+            skip_section = (
+                section in DNT_EMAIL_SECTIONS
+                and ver.release[0] < VERSION_EMAIL_CATEGORY_INTRODUCED
+            )
+            if skip_section:
+                continue
             output_file, log_file = get_tracker_lists(
                 config, section, chunknum)
 
         if section in ENTITYLIST_SECTIONS:
-            ver = p_version.parse(version)
             skip_large_entity_separation = (
                 ver.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
                 and section in LARGE_ENTITIES_SECTIONS
