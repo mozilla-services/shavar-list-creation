@@ -55,3 +55,4 @@ This is run by a Jenkins deployment job every 30 minutes that:
 2. Checks out the [shavar-list-creation-config](https://github.com/mozilla-services/shavar-list-creation-config/) repository
 3. Copies `stage.ini` or `prod.ini` to `shavar_list_creation.ini`
 4. Runs `python lists2safebrowsing.py`, which uploads updated safebrowsing list files to S3 for [shavar](https://github.com/mozilla-services/shavar).
+⚠️ Since there is no concept of deploy for the scripts, the changes that are merged to main are immediately accessible Jenkins for both Stage and Production.
