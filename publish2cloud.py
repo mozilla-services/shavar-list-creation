@@ -57,7 +57,15 @@ except configparser.NoOptionError as err:
 
 def chunk_metadata(fp):
     header = fp.readline().decode().rstrip('\n')
-    chunktype, chunknum, hash_size, data_len = header.split(':')
+    try:
+        chunktype, chunknum, hash_size, data_len = header.split(':')
+    except ValueError:
+        # The tracking list file in S3 is improperly formatted
+        # use dummy values
+        chunktype = 'a'
+        chunknum = '1668785038'
+        hash_size = '32'
+        data_len = '52'
     return dict(
         type=chunktype, num=chunknum, hash_size=hash_size, len=data_len,
         checksum=hashlib.sha256(fp.read()).hexdigest()
