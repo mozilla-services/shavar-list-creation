@@ -692,6 +692,9 @@ def main():
 
     publish_to_cloud(config, chunknum)
 
+    # disable remote-settings upload for versioned lists
+    config.set('main', 'remote_settings_upload', 'False')
+
     # create and publish versioned lists
     resp = requests.get(GITHUB_API_URL + SHAVAR_PROD_LISTS_BRANCHES_PATH)
     if resp:
