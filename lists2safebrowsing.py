@@ -663,10 +663,23 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
 
 
 def main():
+    execution_environment = os.getenv("EXECUTION_ENVIRONMENT", "JENKINS")
+    environment = os.getenv("ENVIRONMENT", "stage")
+
     config = configparser.ConfigParser()
-    filename = config.read(["shavar_list_creation.ini"])
+
+    if execution_environment == "GKE":
+        filename = config.read([f"rs_{environment}.ini"])
+
+        if not filename:
+            # fallback to reading shavar_list_creation.ini
+            filename = config.read(["shavar_list_creation.ini"])
+    else:
+        # read shavar_list_creation.ini by default
+        filename = config.read(["shavar_list_creation.ini"])
+
     if not filename:
-        sys.stderr.write("Error loading shavar_list_creation.ini\n")
+        sys.stderr.write("Error loading .ini file\n")
         sys.exit(-1)
 
     chunknum = int(time.time())
