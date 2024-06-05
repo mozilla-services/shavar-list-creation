@@ -22,8 +22,8 @@ from constants import (
 )
 from packaging import version as p_version
 
-CONFIG = configparser.ConfigParser(os.environ)
-CONFIG.read(['shavar_list_creation.ini'])
+from settings import config as CONFIG
+
 try:
     REMOTE_SETTINGS_URL = ''
     if os.environ.get('SHAVAR_REMOTE_SETTINGS_URL', None):
