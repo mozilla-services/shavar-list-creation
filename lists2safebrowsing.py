@@ -38,6 +38,8 @@ from publish2cloud import (
     publish_to_cloud
 )
 
+from settings import config
+
 updatePSL()
 psl = PublicSuffixList(only_icann=True)
 
@@ -663,12 +665,6 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
 
 
 def main():
-    config = configparser.ConfigParser()
-    filename = config.read(["shavar_list_creation.ini"])
-    if not filename:
-        sys.stderr.write("Error loading shavar_list_creation.ini\n")
-        sys.exit(-1)
-
     chunknum = int(time.time())
 
     for section in config.sections():
