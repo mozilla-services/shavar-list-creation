@@ -35,7 +35,8 @@ from constants import (
     ENTITYLIST_SECTIONS,
 )
 from publish2cloud import (
-    publish_to_cloud
+    publish_to_cloud,
+    request_rs_review
 )
 
 from settings import config
@@ -699,6 +700,11 @@ def main():
     else:
         print('\n\n*** Unable to get branches from shavar-prod-lists repo ***')
 
+    # We have to request review after all versions of the lists are done uploading
+    # to avoid multiple requests
+    # This function is only needed for remote settings uploads, the function checks the
+    # value of "remote_settings_upload" in the config file
+    request_rs_review()
 
 if __name__ == "__main__":
     main()
