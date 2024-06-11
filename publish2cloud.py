@@ -30,6 +30,7 @@ from settings import (
     BearerAuth
 )
 
+from kinto_http import Client, BearerTokenAuth, KintoException
 
 try:
     REMOTE_SETTINGS_URL = ''
@@ -62,6 +63,12 @@ except configparser.NoOptionError as err:
     REMOTE_SETTINGS_PATH = ''
     CLOUDFRONT_USER_ID = None
 
+client = Client(
+    server_url=REMOTE_SETTINGS_URL,
+    bucket=REMOTE_SETTINGS_BUCKET,
+    collection=REMOTE_SETTINGS_COLLECTION,
+    auth=REMOTE_SETTINGS_AUTH
+)
 
 def chunk_metadata(fp):
     header = fp.readline().decode().rstrip('\n')
@@ -84,25 +91,37 @@ def make_record_url_remote_settings(id):
 
 def get_record_remote_settings(id):
     record_url = make_record_url_remote_settings(id)
-    resp = requests.get(record_url, auth=REMOTE_SETTINGS_AUTH, timeout=10)
-    if not resp:
-        print('{0} looks like it hasn\'t been uploaded to '
-              'Remote Settings'.format(id))
+
+    try:
+        record = client.get_record(id=id)
+        print('{0} - Record exists in Remote Settings'
+            .format(id))
+
+        return record
+    except KintoException as e:
+        if e.response.status_code == 404 :
+            print('{0} -  Record does not exist in Remote Settings'
+            .format(id))
+        else:
+            print('{0} -  There was a problem getting record from '
+                    'Remote Settings: {1}'.format(id, e))
         return None
-    record = resp.json()['data']
-    return record
 
 
 def put_new_record_remote_settings(config, section, data):
+    try:
+        rec_resp = client.create_record(id=data['id'],
+            data=data)
+
+        if not rec_resp:
+            print('Failed to create/update record for %s. Error: %s' %
+                (data['Name'], rec_resp.content.decode()))
+            return rec_resp
+    except KintoException as e:
+        print('Failed to create/update record for {0}. Error: {1}'
+                .format(data['Name'], e))
+
     record_url = make_record_url_remote_settings(data['id'])
-    rec_resp = requests.put(
-        record_url, json={'data': data}, auth=REMOTE_SETTINGS_AUTH)
-
-    if not rec_resp:
-        print('Failed to create/update record for %s. Error: %s' %
-              (data['Name'], rec_resp.content.decode()))
-        return rec_resp
-
     attachment_url = record_url + '/attachment'
     files = [('attachment', open(config.get(section, 'output'), 'rb'))]
     att_resp = requests.post(
@@ -135,7 +154,7 @@ def new_data_to_publish_to_remote_settings(config, section, new):
     record = get_record_remote_settings(config.get(section, 'output'))
 
     rs_upload_needed = True
-    if record and record.get('Checksum') == new['checksum']:
+    if record and record.get('data')['Checksum'] == new['checksum']:
         rs_upload_needed = False
     return rs_upload_needed
 
