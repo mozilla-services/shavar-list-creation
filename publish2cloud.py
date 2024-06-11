@@ -22,7 +22,11 @@ from constants import (
 )
 from packaging import version as p_version
 
-from settings import config as CONFIG
+from settings import (
+    config as CONFIG,
+    rs_auth_method,
+    BearerAuth
+)
 
 try:
     REMOTE_SETTINGS_URL = ''
@@ -34,16 +38,27 @@ try:
     )
     REMOTE_SETTINGS_RECORD_PATH = ('/buckets/{bucket_name}'
                                    + '/collections/{collection_name}/records')
-    REMOTE_SETTINGS_AUTH = ('', '')
-    auth_config_exists = (
-        os.environ.get('SHAVAR_REMOTE_SETTINGS_USERNAME', None)
-        and os.environ.get('SHAVAR_REMOTE_SETTINGS_PASSWORD', None)
-    )
-    if auth_config_exists:
-        REMOTE_SETTINGS_AUTH = (
-            CONFIG.get('main', 'remote_settings_username'),
-            CONFIG.get('main', 'remote_settings_password')
+    REMOTE_SETTINGS_AUTH = ''
+    if rs_auth_method == "token":
+        if os.environ.get('SHAVAR_REMOTE_SETTINGS_TOKEN', None):
+            REMOTE_SETTINGS_AUTH = BearerAuth((
+                CONFIG.get('main', 'remote_settings_token')
+            ))
+    elif rs_auth_method == "userpass":
+        REMOTE_SETTINGS_AUTH = ('', '')
+        auth_config_exists = (
+            os.environ.get('SHAVAR_REMOTE_SETTINGS_USERNAME', None)
+            and os.environ.get('SHAVAR_REMOTE_SETTINGS_PASSWORD', None)
         )
+        if auth_config_exists:
+            REMOTE_SETTINGS_AUTH = (
+                CONFIG.get('main', 'remote_settings_username'),
+                CONFIG.get('main', 'remote_settings_password')
+            )
+    else:
+        sys.stderr.write(
+            'No Auth method provided in environment variables\n')
+
     CLOUDFRONT_USER_ID = os.environ.get('CLOUDFRONT_USER_ID', None)
 
 except configparser.NoOptionError as err:
