@@ -18,10 +18,10 @@ if execution_environment != "JENKINS":
     environment = os.getenv("ENVIRONMENT", "stage")
     ini_file = f"rs_{environment}.ini"
 
-filenames = config.read(ini_file)
-
-if not filenames:
-    print(f"Error reading .ini file!", file=sys.stderr)
+try:
+    filenames = config.read(ini_file)
+except Exception as e:
+    print(f"Error reading .ini file: {e}!", file=sys.stderr)
     sys.exit(-1)
 
 # Class to handle Bearer Token Authentication

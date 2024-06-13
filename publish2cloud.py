@@ -8,6 +8,8 @@ import tempfile
 import boto.s3.connection
 import boto.s3.key
 
+from requests.auth import HTTPBasicAuth
+
 from constants import (
     DEFAULT_DISCONNECT_LIST_CATEGORIES,
     DNT_SECTIONS,
@@ -30,7 +32,7 @@ from settings import (
 
 try:
     REMOTE_SETTINGS_URL = ''
-    if os.environ.get('SHAVAR_REMOTE_SETTINGS_URL', None):
+    if os.environ.get('SERVER', None):
         REMOTE_SETTINGS_URL = CONFIG.get('main', 'remote_settings_url')
     REMOTE_SETTINGS_BUCKET = CONFIG.get('main', 'remote_settings_bucket')
     REMOTE_SETTINGS_COLLECTION = CONFIG.get(
@@ -39,25 +41,14 @@ try:
     REMOTE_SETTINGS_RECORD_PATH = ('/buckets/{bucket_name}'
                                    + '/collections/{collection_name}/records')
     REMOTE_SETTINGS_AUTH = ''
-    if rs_auth_method == "token":
-        if os.environ.get('SHAVAR_REMOTE_SETTINGS_TOKEN', None):
-            REMOTE_SETTINGS_AUTH = BearerAuth((
-                CONFIG.get('main', 'remote_settings_token')
-            ))
-    elif rs_auth_method == "userpass":
-        REMOTE_SETTINGS_AUTH = ('', '')
-        auth_config_exists = (
-            os.environ.get('SHAVAR_REMOTE_SETTINGS_USERNAME', None)
-            and os.environ.get('SHAVAR_REMOTE_SETTINGS_PASSWORD', None)
-        )
-        if auth_config_exists:
-            REMOTE_SETTINGS_AUTH = (
-                CONFIG.get('main', 'remote_settings_username'),
-                CONFIG.get('main', 'remote_settings_password')
-            )
-    else:
-        sys.stderr.write(
-            'No Auth method provided in environment variables\n')
+    if os.environ.get('AUTHORIZATION', None):
+        REMOTE_SETTINGS_AUTH = CONFIG.get('main', 'remote_settings_authorization')
+
+    # We can remove the use of BearerAuth() once we switch to kinto-http
+    if rs_auth_method == 'token':
+        REMOTE_SETTINGS_AUTH = BearerAuth(REMOTE_SETTINGS_AUTH)
+    elif rs_auth_method == 'userpass':
+        REMOTE_SETTINGS_AUTH = HTTPBasicAuth(*tuple(REMOTE_SETTINGS_AUTH.split(":", maxsplit=1)))
 
     CLOUDFRONT_USER_ID = os.environ.get('CLOUDFRONT_USER_ID', None)
 
