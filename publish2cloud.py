@@ -30,6 +30,7 @@ from settings import (
     BearerAuth
 )
 
+
 try:
     REMOTE_SETTINGS_URL = ''
     if os.environ.get('SERVER', None):
@@ -38,8 +39,9 @@ try:
     REMOTE_SETTINGS_COLLECTION = CONFIG.get(
         'main', 'remote_settings_collection'
     )
-    REMOTE_SETTINGS_RECORD_PATH = ('/buckets/{bucket_name}'
-                                   + '/collections/{collection_name}/records')
+    REMOTE_SETTINGS_PATH = ('/buckets/{bucket_name}'
+                                   + '/collections/{collection_name}')
+
     REMOTE_SETTINGS_AUTH = ''
     if os.environ.get('AUTHORIZATION', None):
         REMOTE_SETTINGS_AUTH = CONFIG.get('main', 'remote_settings_authorization')
@@ -52,12 +54,12 @@ try:
 
     CLOUDFRONT_USER_ID = os.environ.get('CLOUDFRONT_USER_ID', None)
 
-except configparser.NoOptionError as err:
+except NoOptionError as err:
     REMOTE_SETTINGS_URL = ''
     REMOTE_SETTINGS_AUTH = None
     REMOTE_SETTINGS_BUCKET = ''
     REMOTE_SETTINGS_COLLECTION = ''
-    REMOTE_SETTINGS_RECORD_PATH = ''
+    REMOTE_SETTINGS_PATH = ''
     CLOUDFRONT_USER_ID = None
 
 
@@ -73,11 +75,11 @@ def chunk_metadata(fp):
 def make_record_url_remote_settings(id):
     remote_settings_record_url = (
         REMOTE_SETTINGS_URL
-        + REMOTE_SETTINGS_RECORD_PATH.format(
+        + REMOTE_SETTINGS_PATH.format(
             bucket_name=REMOTE_SETTINGS_BUCKET,
             collection_name=REMOTE_SETTINGS_COLLECTION)
     )
-    return remote_settings_record_url + '/{record_id}'.format(record_id=id)
+    return remote_settings_record_url + '/records/{record_id}'.format(record_id=id)
 
 
 def get_record_remote_settings(id):
@@ -123,7 +125,7 @@ def new_data_to_publish_to_remote_settings(config, section, new):
     remote_settings_config_exists = (REMOTE_SETTINGS_URL
                                      and REMOTE_SETTINGS_BUCKET
                                      and REMOTE_SETTINGS_COLLECTION
-                                     and REMOTE_SETTINGS_RECORD_PATH
+                                     and REMOTE_SETTINGS_PATH
                                      and REMOTE_SETTINGS_AUTH)
     if not remote_settings_config_exists:
         print('Missing config(s) for Remote Settings')
@@ -324,3 +326,35 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
             publish_to_remote_settings(config, section, chunknum)
         else:
             print('Skipping Remote Settings upload for %s' % section)
+
+
+def request_rs_review():
+    if check_upload_config(
+            CONFIG, 'main', 'remote_settings_upload'
+        ) == False:
+        print("\n*** Remote Settings upload is not enabled for this run, no reviews are required ***\n")
+        return
+
+    rs_collection_url = REMOTE_SETTINGS_URL + \
+         REMOTE_SETTINGS_PATH.format(
+            bucket_name=REMOTE_SETTINGS_BUCKET,
+            collection_name=REMOTE_SETTINGS_COLLECTION)
+
+    # Check if we need to send in a request for review
+    rs_collection = requests.get(rs_collection_url, auth=REMOTE_SETTINGS_AUTH, timeout=10)
+
+    if rs_collection:
+        # If any data was published, we want to request review for it
+        # status can be one of "work-in-progress", "to-sign" (approve), "to-review" (request review)
+        if rs_collection.json()['data']['status'] == "work-in-progress":
+            if environment == "dev":
+                print("\n*** Dev server does not require a review, approving changes ***\n")
+                # review not enabled in dev, approve changes
+                requests.patch(rs_collection_url, json={"data": {"status": "to-sign"}}, auth=REMOTE_SETTINGS_AUTH)
+            else:
+                print("\n*** Requesting review for updated/created records ***\n")
+                requests.patch(rs_collection_url, json={"data": {"status": "to-review"}}, auth=REMOTE_SETTINGS_AUTH)
+        else:
+            print("\n*** No changes were made, no new review request is needed ***\n")
+    else:
+        print("\n*** Error while fetching collection status ***\n")
