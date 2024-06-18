@@ -54,7 +54,7 @@ try:
 
     CLOUDFRONT_USER_ID = os.environ.get('CLOUDFRONT_USER_ID', None)
 
-except NoOptionError as err:
+except configparser.NoOptionError as err:
     REMOTE_SETTINGS_URL = ''
     REMOTE_SETTINGS_AUTH = None
     REMOTE_SETTINGS_BUCKET = ''
