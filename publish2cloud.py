@@ -110,7 +110,7 @@ def get_record_remote_settings(id):
 
 def put_new_record_remote_settings(config, section, data):
     try:
-        rec_resp = client.create_record(id=data['id'],
+        rec_resp = client.update_record(id=data['id'],
             data=data)
 
         if not rec_resp:
