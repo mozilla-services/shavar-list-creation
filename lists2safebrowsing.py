@@ -33,10 +33,12 @@ from constants import (
     VERSION_EMAIL_CATEGORY_INTRODUCED,
     VERS_LARGE_ENTITIES_SEPARATION_STARTED,
     ENTITYLIST_SECTIONS,
+    LOWEST_VERSION_SUPPORTED
 )
 from publish2cloud import (
     publish_to_cloud,
-    request_rs_review
+    request_rs_review,
+    deleteAllRecordsInDev
 )
 
 from settings import config
@@ -650,7 +652,7 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
     for branch in shavar_prod_lists_branches:
         branch_name = branch.get('name')
         ver = p_version.parse(branch_name)
-        if isinstance(ver, p_version.Version):
+        if isinstance(ver, p_version.Version) and ver > p_version.parse("{LOWEST_VERSION_SUPPORTED}"):
             print('\n\n*** Start Versioning for {ver} ***'.format(
                 ver=branch_name)
             )
@@ -689,26 +691,26 @@ def main():
 
     publish_to_cloud(config, chunknum)
 
+
+    # create and publish versioned lists
+    try:
+        resp = requests.get(GITHUB_API_URL + SHAVAR_PROD_LISTS_BRANCHES_PATH)
+        if resp.status_code == 200:
+            shavar_prod_lists_branches = resp.json()
+            start_versioning(config, chunknum, shavar_prod_lists_branches)
+        else:
+            print(f'\n\n*** Unable to get branches from shavar-prod-lists repo ***')
+            print(f'Status code: {resp.status_code}')
+            print(f'Response text: {resp.text}')
+    except requests.exceptions.RequestException as e:
+        print(f'\n\n*** An error occurred while trying to get branches from shavar-prod-lists repo ***')
+        print(f'Error: {str(e)}')
+
     # We have to request review after all versions of the lists are done uploading
     # to avoid multiple requests
     # This function is only needed for remote settings uploads, the function checks the
     # value of "remote_settings_upload" in the config file
-    #
-    # We have to request review before disabling remote settings upload until versioning
-    # is implemented
     request_rs_review()
-
-    # disable remote-settings upload for versioned lists
-    config.set('main', 'remote_settings_upload', 'False')
-
-    # create and publish versioned lists
-    resp = requests.get(GITHUB_API_URL + SHAVAR_PROD_LISTS_BRANCHES_PATH)
-    if resp:
-        shavar_prod_lists_branches = resp.json()
-        start_versioning(config, chunknum, shavar_prod_lists_branches)
-    else:
-        print('\n\n*** Unable to get branches from shavar-prod-lists repo ***')
-
 
 if __name__ == "__main__":
     main()
