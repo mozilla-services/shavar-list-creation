@@ -27,7 +27,8 @@ from packaging import version as p_version
 from settings import (
     config as CONFIG,
     rs_auth_method,
-    BearerAuth
+    BearerAuth,
+    environment
 )
 
 from kinto_http import Client, BearerTokenAuth, KintoException
@@ -360,19 +361,19 @@ def request_rs_review():
             collection_name=REMOTE_SETTINGS_COLLECTION)
 
     # Check if we need to send in a request for review
-    rs_collection = requests.get(rs_collection_url, auth=REMOTE_SETTINGS_AUTH, timeout=10)
+    rs_collection = client.get_collection();
 
     if rs_collection:
         # If any data was published, we want to request review for it
         # status can be one of "work-in-progress", "to-sign" (approve), "to-review" (request review)
-        if rs_collection.json()['data']['status'] == "work-in-progress":
+        if rs_collection['data']['status'] == "work-in-progress":
             if environment == "dev":
                 print("\n*** Dev server does not require a review, approving changes ***\n")
                 # review not enabled in dev, approve changes
-                requests.patch(rs_collection_url, json={"data": {"status": "to-sign"}}, auth=REMOTE_SETTINGS_AUTH)
+                client.patch_collection(data={"status": "to-sign"});
             else:
                 print("\n*** Requesting review for updated/created records ***\n")
-                requests.patch(rs_collection_url, json={"data": {"status": "to-review"}}, auth=REMOTE_SETTINGS_AUTH)
+                client.patch_collection(data={"status": "to-review"});
         else:
             print("\n*** No changes were made, no new review request is needed ***\n")
     else:
