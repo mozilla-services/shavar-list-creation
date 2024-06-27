@@ -4,6 +4,7 @@ import os
 import requests
 import sys
 import tempfile
+import math
 
 import boto.s3.connection
 import boto.s3.key
@@ -21,15 +22,18 @@ from constants import (
     PRE_DNT_SECTIONS,
     LARGE_ENTITIES_SECTIONS,
     ENTITYLIST_SECTIONS,
+    LOWEST_VERSION_SUPPORTED
 )
 from packaging import version as p_version
 
 from settings import (
     config as CONFIG,
     rs_auth_method,
-    BearerAuth
+    BearerAuth,
+    environment
 )
 
+from kinto_http import Client, BearerTokenAuth, KintoException
 
 try:
     REMOTE_SETTINGS_URL = ''
@@ -62,6 +66,12 @@ except configparser.NoOptionError as err:
     REMOTE_SETTINGS_PATH = ''
     CLOUDFRONT_USER_ID = None
 
+client = Client(
+    server_url=REMOTE_SETTINGS_URL,
+    bucket=REMOTE_SETTINGS_BUCKET,
+    collection=REMOTE_SETTINGS_COLLECTION,
+    auth=REMOTE_SETTINGS_AUTH
+)
 
 def chunk_metadata(fp):
     header = fp.readline().decode().rstrip('\n')
@@ -83,26 +93,36 @@ def make_record_url_remote_settings(id):
 
 
 def get_record_remote_settings(id):
-    record_url = make_record_url_remote_settings(id)
-    resp = requests.get(record_url, auth=REMOTE_SETTINGS_AUTH, timeout=10)
-    if not resp:
-        print('{0} looks like it hasn\'t been uploaded to '
-              'Remote Settings'.format(id))
+    try:
+        record = client.get_record(id=id)
+        print('{0} - Record exists in Remote Settings'
+            .format(id))
+
+        return record
+    except KintoException as e:
+        if e.response.status_code == 404 :
+            print('{0} -  Record does not exist in Remote Settings'
+            .format(id))
+        else:
+            print('{0} -  There was a problem getting record from '
+                    'Remote Settings: {1}'.format(id, e))
         return None
-    record = resp.json()['data']
-    return record
 
 
 def put_new_record_remote_settings(config, section, data):
+    try:
+        rec_resp = client.update_record(id=data['id'],
+            data=data)
+
+        if not rec_resp:
+            print('Failed to create/update record for %s. Error: %s' %
+                (data['Name'], rec_resp.content.decode()))
+            return rec_resp
+    except KintoException as e:
+        print('Failed to create/update record for {0}. Error: {1}'
+                .format(data['Name'], e))
+
     record_url = make_record_url_remote_settings(data['id'])
-    rec_resp = requests.put(
-        record_url, json={'data': data}, auth=REMOTE_SETTINGS_AUTH)
-
-    if not rec_resp:
-        print('Failed to create/update record for %s. Error: %s' %
-              (data['Name'], rec_resp.content.decode()))
-        return rec_resp
-
     attachment_url = record_url + '/attachment'
     files = [('attachment', open(config.get(section, 'output'), 'rb'))]
     att_resp = requests.post(
@@ -121,7 +141,7 @@ def check_upload_config(config, section, option):
     return False
 
 
-def new_data_to_publish_to_remote_settings(config, section, new):
+def new_data_to_publish_to_remote_settings(config, section, new, version=None):
     remote_settings_config_exists = (REMOTE_SETTINGS_URL
                                      and REMOTE_SETTINGS_BUCKET
                                      and REMOTE_SETTINGS_COLLECTION
@@ -131,13 +151,16 @@ def new_data_to_publish_to_remote_settings(config, section, new):
         print('Missing config(s) for Remote Settings')
         return False
 
-    # Check to see if update is needed on Remote Settings
-    record = get_record_remote_settings(config.get(section, 'output'))
+    record_id = config.get(section, 'output')
 
-    rs_upload_needed = True
-    if record and record.get('Checksum') == new['checksum']:
-        rs_upload_needed = False
-    return rs_upload_needed
+    record_name = record_id
+    if version is not None:
+        record_name = f'{record_id}-{math.trunc(version.release[0])}'
+
+    # Check to see if update is needed on Remote Settings
+    record = get_record_remote_settings(record_name)
+
+    return not (record and record.get('data')['Checksum'] == new['checksum'])
 
 
 def new_data_to_publish_to_s3(config, section, new):
@@ -223,7 +246,7 @@ def publish_to_s3(config, section, chunknum):
     print('Uploaded to s3: %s' % section)
 
 
-def publish_to_remote_settings(config, section, chunknum):
+def publish_to_remote_settings(config, section, chunknum, version):
     list_type = ''
     categories = []
     excluded_categories = []
@@ -250,19 +273,29 @@ def publish_to_remote_settings(config, section, chunknum):
 
     list_name = config.get(section, 'output')
     chunk_file = chunk_metadata(open(config.get(section, 'output'), 'rb'))
+
+    filter_exp = f'env.version <= "{LOWEST_VERSION_SUPPORTED}a1"'
+    id_exp = list_name
+
+    if version is not None:
+        # the version format has to be of the form {versionnum}a1 => eg. 129.0a1
+        filter_exp = f'env.version == "{version}a1"'
+        id_exp = f'{list_name}-{math.trunc(version.release[0])}'
+
     record_data = {
-        'id': list_name,
+        'id': id_exp,
         'Categories': categories,
         'ExcludedCategories': excluded_categories,
         'Type': list_type,
         'Name': list_name,
         'Checksum': chunk_file['checksum'],
         'Version': chunknum,
+        'filter_expression': filter_exp
     }
     put_new_record_remote_settings(config, section, record_data)
     print('Uploaded to remote settings: %s' % list_name)
 
-
+# what should the default version be?
 def publish_to_cloud(config, chunknum, check_versioning=None):
     # Optionally upload to S3. If s3_upload is set, then s3_bucket and s3_key
     # must be set.
@@ -270,6 +303,8 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
         if section == 'main':
             continue
 
+        # Set default version as None
+        version = None
         if check_versioning:
             versioning_needed = (
                 config.has_option(section, 'versioning_needed')
@@ -307,7 +342,7 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
 
         try:
             rs_upload_needed = new_data_to_publish_to_remote_settings(
-                config, section, new
+                config, section, new, version
             )
         except (requests.exceptions.ConnectTimeout,
                 requests.exceptions.ReadTimeout):
@@ -323,7 +358,7 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
             print('Skipping S3 upload for %s' % section)
 
         if rs_upload_needed and upload_to_remote_setting:
-            publish_to_remote_settings(config, section, chunknum)
+            publish_to_remote_settings(config, section, chunknum, version)
         else:
             print('Skipping Remote Settings upload for %s' % section)
 
@@ -358,3 +393,11 @@ def request_rs_review():
             print("\n*** No changes were made, no new review request is needed ***\n")
     else:
         print("\n*** Error while fetching collection status ***\n")
+
+# Helper function that clears all records in dev
+def deleteAllRecordsInDev():
+    if environment == "dev":
+        try:
+            client.delete_records()
+        except KintoException as e:
+            print('!!!! Failed to all delete records: {0}!!!!'.format(e))

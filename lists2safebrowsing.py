@@ -650,7 +650,7 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
     for branch in shavar_prod_lists_branches:
         branch_name = branch.get('name')
         ver = p_version.parse(branch_name)
-        if isinstance(ver, p_version.Version):
+        if isinstance(ver, p_version.Version) and ver > p_version.parse("108"):
             print('\n\n*** Start Versioning for {ver} ***'.format(
                 ver=branch_name)
             )
@@ -689,16 +689,22 @@ def main():
 
     publish_to_cloud(config, chunknum)
 
-    # disable remote-settings upload for versioned lists
-    config.set('main', 'remote_settings_upload', 'False')
+    # # disable remote-settings upload for versioned lists
+    # config.set('main', 'remote_settings_upload', 'False')
 
     # create and publish versioned lists
-    resp = requests.get(GITHUB_API_URL + SHAVAR_PROD_LISTS_BRANCHES_PATH)
-    if resp:
-        shavar_prod_lists_branches = resp.json()
-        start_versioning(config, chunknum, shavar_prod_lists_branches)
-    else:
-        print('\n\n*** Unable to get branches from shavar-prod-lists repo ***')
+    try:
+        resp = requests.get(GITHUB_API_URL + SHAVAR_PROD_LISTS_BRANCHES_PATH)
+        if resp.status_code == 200:
+            shavar_prod_lists_branches = resp.json()
+            start_versioning(config, chunknum, shavar_prod_lists_branches)
+        else:
+            print(f'\n\n*** Unable to get branches from shavar-prod-lists repo ***')
+            print(f'Status code: {resp.status_code}')
+            print(f'Response text: {resp.text}')
+    except requests.exceptions.RequestException as e:
+        print(f'\n\n*** An error occurred while trying to get branches from shavar-prod-lists repo ***')
+        print(f'Error: {str(e)}')
 
     # We have to request review after all versions of the lists are done uploading
     # to avoid multiple requests
