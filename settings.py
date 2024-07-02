@@ -23,8 +23,8 @@ config = ConfigParser(os.environ)
 ini_file = "shavar_list_creation.ini"
 
 # For local testing and GKE environments we want to use the rs_*.ini file
+environment = os.getenv("ENVIRONMENT", "dev")
 if execution_environment != "JENKINS":
-    environment = os.getenv("ENVIRONMENT", "dev")
     ini_file = f"rs_{environment}.ini"
 
 try:
