@@ -689,6 +689,15 @@ def main():
 
     publish_to_cloud(config, chunknum)
 
+    # We have to request review after all versions of the lists are done uploading
+    # to avoid multiple requests
+    # This function is only needed for remote settings uploads, the function checks the
+    # value of "remote_settings_upload" in the config file
+    #
+    # We have to request review before disabling remote settings upload until versioning
+    # is implemented
+    request_rs_review()
+
     # disable remote-settings upload for versioned lists
     config.set('main', 'remote_settings_upload', 'False')
 
@@ -700,11 +709,6 @@ def main():
     else:
         print('\n\n*** Unable to get branches from shavar-prod-lists repo ***')
 
-    # We have to request review after all versions of the lists are done uploading
-    # to avoid multiple requests
-    # This function is only needed for remote settings uploads, the function checks the
-    # value of "remote_settings_upload" in the config file
-    request_rs_review()
 
 if __name__ == "__main__":
     main()
