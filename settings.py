@@ -1,7 +1,9 @@
 from configparser import ConfigParser, NoOptionError
 import sys
 import os
+import math
 from requests import auth
+from packaging import version as p_version
 
 # Class to handle Bearer Token Authentication
 class BearerAuth(auth.AuthBase):
@@ -32,3 +34,25 @@ try:
 except Exception as e:
     print(f"Error reading .ini file: {e}!", file=sys.stderr)
     sys.exit(-1)
+
+class SharedVersionNumbers:
+    def __init__(self):
+        self.latest_supported_version = -math.inf
+        self.oldest_supported_version = math.inf
+
+    def updateSupportedVersions(self, prod_list_branches, config):
+        for branch in prod_list_branches:
+            branch_name = branch.get('name')
+            ver = p_version.parse(branch_name)
+
+            if isinstance(ver, p_version.Version):
+                if (ver.release[0] > self.latest_supported_version):
+                    self.latest_supported_version = ver.release[0]
+
+        self.oldest_supported_version = self.latest_supported_version - int(config.get('main', 'num_supported_versions'))
+
+        print(f'\n\n The oldest supported version is {self.oldest_supported_version}\n')
+        print(f'\n The latest supported version is {self.latest_supported_version}\n\n')
+
+# initialize the shared variables
+shared_state = SharedVersionNumbers()

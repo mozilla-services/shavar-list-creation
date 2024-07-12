@@ -21,8 +21,7 @@ from constants import (
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
     LARGE_ENTITIES_SECTIONS,
-    ENTITYLIST_SECTIONS,
-    LOWEST_VERSION_SUPPORTED
+    ENTITYLIST_SECTIONS
 )
 from packaging import version as p_version
 
@@ -30,7 +29,8 @@ from settings import (
     config as CONFIG,
     rs_auth_method,
     BearerAuth,
-    environment
+    environment,
+    shared_state
 )
 
 from kinto_http import Client, BearerTokenAuth, KintoException
@@ -57,6 +57,7 @@ try:
         REMOTE_SETTINGS_AUTH = HTTPBasicAuth(*tuple(REMOTE_SETTINGS_AUTH.split(":", maxsplit=1)))
 
     CLOUDFRONT_USER_ID = os.environ.get('CLOUDFRONT_USER_ID', None)
+    NUMBER_OF_SUPPORTED_VERSIONS = CONFIG.get('main', 'num_supported_versions')
 
 except configparser.NoOptionError as err:
     REMOTE_SETTINGS_URL = ''
@@ -156,6 +157,16 @@ def new_data_to_publish_to_remote_settings(config, section, new, version=None):
     record_name = record_id
     if version is not None:
         record_name = f'{record_id}-{math.trunc(version.release[0])}'
+
+        if shared_state.latest_supported_version - version.release[0] > int(config.get('main', 'num_supported_versions')):
+            deleteRecordFromRemoteSettings(record_name)
+
+            # Since we don't support this version, we can return False
+            return False
+
+        if shared_state.oldest_supported_version == version.release[0]:
+            # We want to update the oldest supported version with a new filter_expression
+            return True
 
     # Check to see if update is needed on Remote Settings
     record = get_record_remote_settings(record_name)
@@ -274,24 +285,35 @@ def publish_to_remote_settings(config, section, chunknum, version):
     list_name = config.get(section, 'output')
     chunk_file = chunk_metadata(open(config.get(section, 'output'), 'rb'))
 
-    filter_exp = f'env.version <= "{LOWEST_VERSION_SUPPORTED}"'
-    id_exp = list_name
-
-    if version is not None:
-        next_version = version.release[0] + 1
-        filter_exp = f'env.version|versionCompare("{version}") >= 0 && env.version|versionCompare("{next_version}") < 0'
-        id_exp = f'{list_name}-{math.trunc(version.release[0])}'
-
+    # Default data
     record_data = {
-        'id': id_exp,
+        'id': list_name,
         'Categories': categories,
         'ExcludedCategories': excluded_categories,
         'Type': list_type,
         'Name': list_name,
         'Checksum': chunk_file['checksum'],
         'Version': chunknum,
-        'filter_expression': filter_exp
+        # The default master branch is the latest list in shavar-prod-lists, we use filter_expression
+        # to make sure only the latest fx versions use this list by setting the expression to greater than
+        # the "latest_supported_version" + 1, since the latest_supported_version is the highest version number in
+        # the shavar prod lists branch names
+        'filter_expression': f'env.version|versionCompare("{shared_state.latest_supported_version+1}") >= 0'
     }
+
+    # Add fields for versioned lists
+    if version is not None:
+        record_data['id'] = f'{list_name}-{math.trunc(version.release[0])}'
+
+        next_version = version.release[0] + 1
+        if version.release[0] == shared_state.oldest_supported_version:
+            # For all unsupported fx versions, we serve the oldest supported version
+            record_data['filter_expression'] = f'env.version|versionCompare("{version}") <= 0'
+        else:
+            # This filter_expression makes sure that a supported version is only given it's exact
+            # versioned list
+            record_data['filter_expression'] = f'env.version|versionCompare("{version}") >= 0 && env.version|versionCompare("{next_version}") < 0'
+
     put_new_record_remote_settings(config, section, record_data)
     print('Uploaded to remote settings: %s' % list_name)
 
@@ -393,6 +415,7 @@ def request_rs_review():
     else:
         print("\n*** Error while fetching collection status ***\n")
 
+
 # Helper function that clears all records in dev
 def deleteAllRecordsInDev():
     if environment == "dev":
@@ -400,3 +423,17 @@ def deleteAllRecordsInDev():
             client.delete_records()
         except KintoException as e:
             print('!!!! Failed to all delete records: {0}!!!!'.format(e))
+
+
+# Delete all records related to version 'ver'
+def deleteRecordFromRemoteSettings(list_id):
+    print(f'\n*** Deleting record with id {list_id} ***')
+    try:
+        client.delete_record(id=list_id)
+    except KintoException as e:
+        error_info = e.response.json()
+        if 'errno' in error_info and error_info['errno'] == 110:
+            print(f"{list_id} not found\n\n")
+        else:
+            # Re-raise the exception if it's not errno 110
+            raise
