@@ -57,7 +57,6 @@ try:
         REMOTE_SETTINGS_AUTH = HTTPBasicAuth(*tuple(REMOTE_SETTINGS_AUTH.split(":", maxsplit=1)))
 
     CLOUDFRONT_USER_ID = os.environ.get('CLOUDFRONT_USER_ID', None)
-    NUMBER_OF_SUPPORTED_VERSIONS = CONFIG.get('main', 'num_supported_versions')
 
 except configparser.NoOptionError as err:
     REMOTE_SETTINGS_URL = ''
@@ -433,7 +432,7 @@ def deleteRecordFromRemoteSettings(list_id):
     except KintoException as e:
         error_info = e.response.json()
         if 'errno' in error_info and error_info['errno'] == 110:
-            print(f"{list_id} not found\n\n")
+            print(f"{list_id} not found\n")
         else:
             # Re-raise the exception if it's not errno 110
             raise
