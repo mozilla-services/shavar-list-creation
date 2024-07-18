@@ -32,14 +32,17 @@ from constants import (
     TEST_DOMAIN_TEMPLATE,
     VERSION_EMAIL_CATEGORY_INTRODUCED,
     VERS_LARGE_ENTITIES_SEPARATION_STARTED,
-    ENTITYLIST_SECTIONS,
+    ENTITYLIST_SECTIONS
 )
 from publish2cloud import (
     publish_to_cloud,
     request_rs_review
 )
 
-from settings import config
+from settings import (
+    config,
+    shared_state
+)
 
 updatePSL()
 psl = PublicSuffixList(only_icann=True)
@@ -48,7 +51,6 @@ GITHUB_API_URL = 'https://api.github.com'
 SHAVAR_PROD_LISTS_BRANCHES_PATH = (
     '/repos/mozilla-services/shavar-prod-lists/branches?per_page=100'
 )
-
 
 def get_output_and_log_files(config, section):
     output_file = None
@@ -650,6 +652,7 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
     for branch in shavar_prod_lists_branches:
         branch_name = branch.get('name')
         ver = p_version.parse(branch_name)
+
         if isinstance(ver, p_version.Version):
             print('\n\n*** Start Versioning for {ver} ***'.format(
                 ver=branch_name)
@@ -663,7 +666,6 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
             print('\n\n*** {branch} is not a versioning branch ***'.format(
                 branch=branch_name)
             )
-
 
 def main():
     chunknum = int(time.time())
@@ -687,28 +689,31 @@ def main():
     if log_file:
         log_file.close()
 
-    publish_to_cloud(config, chunknum)
+    # create and publish versioned lists
+    try:
+        resp = requests.get(GITHUB_API_URL + SHAVAR_PROD_LISTS_BRANCHES_PATH)
+        if resp.status_code == 200:
+            shavar_prod_lists_branches = resp.json()
+
+            shared_state.updateSupportedVersions(shavar_prod_lists_branches, config)
+
+            # Default version
+            publish_to_cloud(config, chunknum)
+
+            start_versioning(config, chunknum, shavar_prod_lists_branches)
+        else:
+            print(f'\n\n*** Unable to get branches from shavar-prod-lists repo ***')
+            print(f'Status code: {resp.status_code}')
+            print(f'Response text: {resp.text}')
+    except requests.exceptions.RequestException as e:
+        print(f'\n\n*** An error occurred while trying to get branches from shavar-prod-lists repo ***')
+        print(f'Error: {str(e)}')
 
     # We have to request review after all versions of the lists are done uploading
     # to avoid multiple requests
     # This function is only needed for remote settings uploads, the function checks the
     # value of "remote_settings_upload" in the config file
-    #
-    # We have to request review before disabling remote settings upload until versioning
-    # is implemented
     request_rs_review()
-
-    # disable remote-settings upload for versioned lists
-    config.set('main', 'remote_settings_upload', 'False')
-
-    # create and publish versioned lists
-    resp = requests.get(GITHUB_API_URL + SHAVAR_PROD_LISTS_BRANCHES_PATH)
-    if resp:
-        shavar_prod_lists_branches = resp.json()
-        start_versioning(config, chunknum, shavar_prod_lists_branches)
-    else:
-        print('\n\n*** Unable to get branches from shavar-prod-lists repo ***')
-
 
 if __name__ == "__main__":
     main()
