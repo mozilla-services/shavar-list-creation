@@ -41,6 +41,10 @@ class SharedVersionNumbers:
         self.oldest_supported_version = math.inf
 
     def updateSupportedVersions(self, prod_list_branches, config):
+        # make sure remote settings is enabled
+        if config.get('main', 'remote_settings_upload') == False:
+            return
+
         for branch in prod_list_branches:
             branch_name = branch.get('name')
             ver = p_version.parse(branch_name)
