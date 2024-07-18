@@ -14,7 +14,7 @@ class BearerAuth(auth.AuthBase):
         return r
 
 
-# For local testing purposes, make sure to set RS_TESTING_ENVIRONMENT to True,
+# For local testing purposes, make sure to set
 # ENVIRONMENT to "dev", and EXECUTION_ENVIRONMENT to "GKE"
 
 execution_environment = os.getenv("EXECUTION_ENVIRONMENT", "JENKINS")
@@ -42,8 +42,11 @@ class SharedVersionNumbers:
 
     def updateSupportedVersions(self, prod_list_branches, config):
         # make sure remote settings is enabled
-        if config.get('main', 'remote_settings_upload') == False:
-            return
+        if config.has_option('main', 'remote_settings_upload'):
+            if config.getboolean('main', 'remote_settings_upload') != True:
+                return False
+        else:
+            return False
 
         for branch in prod_list_branches:
             branch_name = branch.get('name')
