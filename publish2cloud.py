@@ -295,9 +295,9 @@ def publish_to_remote_settings(config, section, chunknum, version):
         'Version': chunknum,
         # The default master branch is the latest list in shavar-prod-lists, we use filter_expression
         # to make sure only the latest fx versions use this list by setting the expression to greater than
-        # the "latest_supported_version" + 1, since the latest_supported_version is the highest version number in
+        # the "latest_supported_version" + 1 .0a1, since the latest_supported_version is the highest version number in
         # the shavar prod lists branch names
-        'filter_expression': f'env.version|versionCompare("{shared_state.latest_supported_version+1}") >= 0'
+        'filter_expression': f'env.version|versionCompare("{shared_state.latest_supported_version+1}.0a1") >= 0'
     }
 
     # Add fields for versioned lists
@@ -307,11 +307,13 @@ def publish_to_remote_settings(config, section, chunknum, version):
         next_version = version.release[0] + 1
         if version.release[0] == shared_state.oldest_supported_version:
             # For all unsupported fx versions, we serve the oldest supported version
-            record_data['filter_expression'] = f'env.version|versionCompare("{version}") <= 0'
+            # Note: we have to compare against the nightly version, since 128.0a1 < 128.0b1 < 128.0
+            record_data['filter_expression'] = f'env.version|versionCompare("{version}a1") <= 0'
         else:
             # This filter_expression makes sure that a supported version is only given it's exact
             # versioned list
-            record_data['filter_expression'] = f'env.version|versionCompare("{version}") >= 0 && env.version|versionCompare("{next_version}") < 0'
+            # Note: we need to add a .0 to the next_version, since version.release[0] is an integer
+            record_data['filter_expression'] = f'env.version|versionCompare("{version}a1") >= 0 && env.version|versionCompare("{next_version}.0a1") < 0'
 
     put_new_record_remote_settings(config, section, record_data)
     print('Uploaded to remote settings: %s' % list_name)
