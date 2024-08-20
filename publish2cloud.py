@@ -284,7 +284,20 @@ def publish_to_remote_settings(config, section, chunknum, version):
     list_name = config.get(section, 'output')
     chunk_file = chunk_metadata(open(config.get(section, 'output'), 'rb'))
 
-    # Default data
+    # Note: versionCompare treats beta as less than release, i.e. 128.0a1 < 128.0b1 < 128.0
+    # To account for this, we should compare the versions with Nightly
+    #
+    # For example, if the client is fx129.0b1:
+    #
+    # If we used release to compare:
+    #   The filter expression match would be 128.0 <= client < 129.0 ===> list for version 128 would be served.
+    #   This is incorrect
+    #
+    # Instead, using nightly to compare:
+    #   The filter expression match is 129.0a1 <= client < 129.0a1 ===> list for version 129 is served
+    #   This is the expected behaviour
+
+    # This is the default list (used for the master branch for Nightly)
     record_data = {
         'id': list_name,
         'Categories': categories,
