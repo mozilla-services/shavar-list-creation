@@ -294,7 +294,7 @@ def publish_to_remote_settings(config, section, chunknum, version):
     #   This is incorrect
     #
     # Instead, using nightly to compare:
-    #   The filter expression match is 129.0a1 <= client < 129.0a1 ===> list for version 129 is served
+    #   The filter expression match is 129.0a1 <= client < 130.0a1 ===> list for version 129 is served
     #   This is the expected behaviour
 
     # This is the default list (used for the master branch for Nightly)
