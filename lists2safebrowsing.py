@@ -307,14 +307,16 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
         num_test_domain_added += 1
         previous_domain = canonicalized_domain
 
+    test_domain_formatted = '{0}-{1}'.format("nightly", test_domain)
     if version:
-        test_domain = '{0}-{1}'.format(version.replace('.', '-'), test_domain)
-        canonicalized_domain = canonicalize(test_domain)
-        added = add_domain_to_list(test_domain, canonicalized_domain,
-                                   previous_domain, log_file, output)
-        if added:
-            num_test_domain_added += 1
-            previous_domain = canonicalized_domain
+        test_domain_formatted = '{0}-{1}'.format(version.replace('.', '-'), test_domain)
+
+    canonicalized_domain = canonicalize(test_domain_formatted)
+    added = add_domain_to_list(test_domain_formatted, canonicalized_domain,
+                                previous_domain, log_file, output)
+    if added:
+        num_test_domain_added += 1
+        previous_domain = canonicalized_domain
 
     if num_test_domain_added > 0:
         # TODO?: hashdata_bytes += hashdata.digest_size
