@@ -170,6 +170,13 @@ def new_data_to_publish_to_remote_settings(config, section, new, version=None):
     # Check to see if update is needed on Remote Settings
     record = get_record_remote_settings(record_name)
 
+    if version is None:
+        # We need to check if the filter_expression needs to be updated for the
+        # nightly records. The filter_expression needs to be updated if the
+        # latest supported version has changed
+        if record.get('data')['filter_expression'] != f'env.version|versionCompare("{shared_state.latest_supported_version}.0a1") <= 0':
+            return True
+
     return not (record and record.get('data')['Checksum'] == new['checksum'])
 
 
