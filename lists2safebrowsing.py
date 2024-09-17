@@ -328,6 +328,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
     # list file to ensure that changes in the order of domains will not
     # cause unnecessary updates
     domains.sort(key=lambda d: d[1])
+    added_domains = []
     for domain, canonicalized_domain in domains:
         added = add_domain_to_list(domain, canonicalized_domain,
                                    previous_domain, log_file, output)
@@ -336,6 +337,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
             hashdata_bytes += 32
             publishing += 1
             previous_domain = canonicalized_domain
+            added_domains.append(domain)
 
     # Write safebrowsing-list format header
     output_bytes = b"a:%d:32:%d\n" % (chunk, hashdata_bytes)
@@ -346,7 +348,7 @@ def write_safebrowsing_blocklist(domains, output_name, log_file, chunk,
 
     print("Tracking protection(%s): publishing %d items; file size %d" %
           (name, publishing, len(output_bytes)))
-    return
+    return added_domains
 
 
 def process_entitylist(incoming, chunk, output_file, log_file, list_variant):
@@ -420,6 +422,16 @@ def process_plugin_blocklist(incoming, chunk, output_file, log_file,
         list_variant, publishing, output_size))
 
 
+def get_json_list(config, section, domains):
+    companies = set()
+    list_name = config.get(section, 'output')
+    if config.has_option(section, 'version'):
+        list_name = '{}-{}'.format(config.get(section, 'version'), list_name)
+    json_file = open(list_name + '.json', "w")
+    json.dump(domains, json_file, indent=2)
+    json_file.close()
+
+
 def get_tracker_lists(config, section, chunknum):
     blocklist_url = get_list_url(config, section, "disconnect_url")
     parser = DisconnectParser(blocklist_url=blocklist_url)
@@ -473,10 +485,11 @@ def get_tracker_lists(config, section, chunknum):
     output_filename = config.get(section, "output")
     version = (config.has_option(section, "version")
                and config.get(section, "version"))
-    write_safebrowsing_blocklist(
+    sorted_domains = write_safebrowsing_blocklist(
         blocked_domains, output_filename, log_file, chunknum,
         output_file, section, version
     )
+    get_json_list(config, section, sorted_domains)
     return output_file, log_file
 
 
@@ -499,6 +512,7 @@ def get_entity_lists(config, section, chunknum):
     entitylist = load_json_from_url(
         config, section, "entity_url"
     ).pop('entities')
+    get_json_list(config, section, entitylist)
 
     if channel_needs_separation and list_needs_separation:
         google_entitylist = {}
@@ -630,7 +644,6 @@ def get_versioned_lists(config, chunknum, version):
                 and ver.release[0] < VERSION_EMAIL_CATEGORY_INTRODUCED
             )
             if skip_section:
-                # import ipdb; ipdb.set_trace()
                 continue
             output_file, log_file = get_tracker_lists(
                 config, section, chunknum)
