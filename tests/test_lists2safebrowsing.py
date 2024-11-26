@@ -6,7 +6,7 @@ from unittest.mock import call, patch, mock_open
 
 import pytest
 from trackingprotection_tools import DisconnectParser
-
+import utils
 import lists2safebrowsing as l2s
 from constants import (
     LIST_TYPE_ENTITY,
@@ -296,15 +296,15 @@ def test_get_output_and_log_files_no_filename(config):
 )
 def test_get_list_url(config, section, key, expected_url):
     """Validate getting list URL from configuration file."""
-    assert l2s.get_list_url(config, section, key) == expected_url
+    assert utils.get_list_url(config, section, key) == expected_url
 
 
 def test_load_json_from_url(config):
     """Test loading the JSON entity list from a URL."""
     data = json.dumps(TEST_ENTITY_DICT)
-    with patch("lists2safebrowsing.urlopen",
+    with patch("utils.urlopen",
                mock_open(read_data=data.encode())) as mocked_open:
-        loaded_json = l2s.load_json_from_url(config, "entity-whitelist",
+        loaded_json = utils.load_json_from_url(config, "entity-whitelist",
                                              "entity_url")
 
     urlopen_calls = mocked_open.call_args_list
@@ -320,9 +320,9 @@ def test_load_json_from_url(config):
 def test_load_json_from_url_exception(capsys, config):
     """Test load_json_from_url when opening the URL fails."""
     error = Exception
-    with patch("lists2safebrowsing.urlopen", side_effect=error):
+    with patch("utils.urlopen", side_effect=error):
         with pytest.raises(SystemExit) as e:
-            l2s.load_json_from_url(config, "entity-whitelist", "entity_url")
+            utils.load_json_from_url(config, "entity-whitelist", "entity_url")
 
     expected_error_msg = (
         "Error loading %s: %s\n" % (ENTITY_LIST_URL, repr(error()))
@@ -451,7 +451,7 @@ def _get_expected_print(category_filters, print_info):
 def test_get_domains_from_category_filters(capsys, parser, category_filters,
                                            expected_output, print_info):
     """Test filtering domains by category."""
-    output = l2s.get_domains_from_category_filters(parser, category_filters)
+    output = utils.get_domains_from_category_filters(parser, category_filters)
 
     expected_print = _get_expected_print(category_filters, print_info)
 
@@ -462,14 +462,14 @@ def test_get_domains_from_category_filters(capsys, parser, category_filters,
 def test_get_domains_from_category_filters_invalid_input():
     """Test invalid input handling in get_domains_from_category_filters."""
     with pytest.raises(ValueError):
-        l2s.get_domains_from_category_filters(None, "Advertising")
+        utils.get_domains_from_category_filters(None, "Advertising")
 
 
 def test_get_domains_from_filters(capsys, parser):
     """Validate domain filtering."""
     category_filters = [["Analytics"]]
 
-    output = l2s.get_domains_from_filters(parser, category_filters)
+    output = utils.get_domains_from_filters(parser, category_filters)
 
     expected_output = {"clickguard.com", "google-analytics.com",
                        "postrank.com"}
@@ -485,7 +485,7 @@ def test_get_domains_from_filters_category_exclusion(capsys, parser):
     category_filters = [["Advertising"]]
     category_exclusion_filters = [["FingerprintingInvasive"]]
 
-    output = l2s.get_domains_from_filters(parser, category_filters,
+    output = utils.get_domains_from_filters(parser, category_filters,
                                           category_exclusion_filters)
 
     expected_output = {"adnetwork.net"}
@@ -503,7 +503,7 @@ def test_get_domains_from_filters_tags(capsys, parser):
     category_filters = [["Cryptomining"]]
     tag_filters = "performance"
 
-    output = l2s.get_domains_from_filters(parser, category_filters,
+    output = utils.get_domains_from_filters(parser, category_filters,
                                           tag_filters=tag_filters)
 
     expected_output = {"coinpot.co"}
@@ -633,11 +633,10 @@ def test_process_list(capsys, chunknum, log, list_type):
     assert capsys.readouterr().out == expected_print
 
 
-def _get_entity_or_plugin_lists(chunknum, config, function, section, data):
-    """Auxiliary function for get_entity_lists/get_plugin_lists tests."""
-    with patch("lists2safebrowsing.urlopen",
-               mock_open(read_data=data.encode())) as mocked_urlopen, \
-            patch("lists2safebrowsing.open", mock_open()) as mocked_open:
+def _get_lists(chunknum, config, function, section, data, mock_target):
+    """Generic auxiliary function to test entity/plugin list functions."""
+    with patch(f"{mock_target}.urlopen", mock_open(read_data=data.encode())) as mocked_urlopen, \
+         patch(f"lists2safebrowsing.open", mock_open()) as mocked_open:
         output_file, _ = function(config, section, chunknum)
 
     urlopen_calls = mocked_urlopen.call_args_list
@@ -648,6 +647,13 @@ def _get_entity_or_plugin_lists(chunknum, config, function, section, data):
 
     return urlopen_calls, open_calls, output_writes
 
+def _get_entity_lists(chunknum, config, function, section, data):
+    """Wrapper function for entity list testing."""
+    return _get_lists(chunknum, config, function, section, data, "utils")
+
+def _get_plugin_lists(chunknum, config, function, section, data):
+    """Wrapper function for plugin list testing."""
+    return _get_lists(chunknum, config, function, section, data, "lists2safebrowsing")
 
 @pytest.mark.parametrize(
     "section,version,testcase",
@@ -661,7 +667,7 @@ def test_get_entity_lists(config, chunknum, section, version, testcase):
 
     data = json.dumps(TEST_ENTITY_DICT)
 
-    urlopen_calls, open_calls, output_writes = _get_entity_or_plugin_lists(
+    urlopen_calls, open_calls, output_writes = _get_entity_lists(
         chunknum, config, l2s.get_entity_lists, section, data)
 
     expected_urlopen_calls = [call(ENTITY_LIST_URL)]
@@ -693,7 +699,7 @@ def test_get_plugin_lists(config, chunknum):
     # Add a comment line and a line with whitespace
     data = "\n".join(["# Comment", "    "] + domains)
 
-    urlopen_calls, open_calls, output_writes = _get_entity_or_plugin_lists(
+    urlopen_calls, open_calls, output_writes = _get_plugin_lists(
         chunknum, config, l2s.get_plugin_lists, section, data)
 
     expected_urlopen_calls = [call(PLUGIN_LIST_URL)]
@@ -742,7 +748,7 @@ def test_get_tracker_lists(config, parser, chunknum, section, domains,
         version = "78.0"
         config.set(section, "version", version)
 
-    with patch("lists2safebrowsing.DisconnectParser", return_value=parser), \
+    with patch("utils.DisconnectParser", return_value=parser), \
             patch("lists2safebrowsing.open", mock_open()) as mocked_open:
         if testcase == "invalid_tag":
             with pytest.raises(ValueError):
