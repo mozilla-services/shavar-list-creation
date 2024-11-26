@@ -4,6 +4,7 @@ from settings import config
 from constants import (
     DNT_SECTIONS,
     PRE_DNT_SECTIONS,
+    ENTITYLIST_SECTIONS,
     WEBKIT_LISTS_DIR,
     WEBKIT_BLOCK_ALL,
     WEBKIT_BLOCK_COOKIES
@@ -92,7 +93,6 @@ def generate_webkit_lists(domains, action_type, name, entities):
 def main():
     tracker_lists = {}
     entities = {}
-
     # Process each section in the configuration
     for name in config.sections():
         section = config[name]
@@ -104,7 +104,7 @@ def main():
         if name in PRE_DNT_SECTIONS or name in DNT_SECTIONS:
             tracker_lists.update(get_tracker_lists(name))
         
-        if name == "entity-whitelist":
+        if name in ENTITYLIST_SECTIONS:
             entities = get_entity_list(name)
 
     for name, domains in tracker_lists.items():
