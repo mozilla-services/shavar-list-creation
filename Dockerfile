@@ -20,4 +20,4 @@ RUN python -m pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code
 COPY --chown=app:app . .
 
-CMD ["python", "lists2safebrowsing.py"]
+CMD ["sh", "enrypoint.sh"]
