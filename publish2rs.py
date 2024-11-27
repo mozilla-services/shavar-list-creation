@@ -15,8 +15,8 @@ def get_config_if_env(env_var, config_section, config_option, fallback=""):
     Return the config value if the environment variable exists; otherwise, return the fallback.
     """
     if env_var in os.environ:
-        return config.get(config_section, config_option, fallback=fallback)
-    return fallback
+        return os.environ[env_var]
+    return config.get(config_section, config_option, fallback=fallback)
 
 def get_file_hash(list_path):
     with open(list_path, "rb") as f:
@@ -53,7 +53,7 @@ def publish2rs():
             to_create.append({"name": name})
         elif remote_attachment["hash"] != hash:
             to_update.append({"id": remote_attachment["id"], "name": name})
-    # Remaining records in `remote_by_name_and_hash` are to be deleted.
+    # Remaining records in `remote_attachments` are to be deleted.
     to_delete = [{"id": record["id"]} for _, record in remote_attachments.items()]
 
     # Print changes
@@ -73,7 +73,7 @@ def publish2rs():
         for record in to_delete:
             batch.delete_record(id=record["id"])
 
-    # Adding, updating attachments on clien
+    # Adding, updating attachments on client
     # since batch operations are not supported.
     for record in to_create:
         id = str(uuid.uuid4())
