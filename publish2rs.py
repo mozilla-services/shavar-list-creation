@@ -62,6 +62,11 @@ def publish2rs():
     print(f"To update: {to_update}")
     print(f"To delete: {to_delete}")
 
+    has_pending_changes = (len(to_create) + len(to_update) + len(to_delete)) > 0
+    if not has_pending_changes:
+        print("Records are in sync. Nothing to do ✅.")
+        return os.EX_OK
+
     # Batch delete operations.
     # NOTE: Attachment deletion is implicit when deleting a record.
     with client.batch() as batch:
