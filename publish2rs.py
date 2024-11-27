@@ -23,7 +23,7 @@ def get_file_hash(list_path):
         return hashlib.sha256(f.read()).hexdigest()
 
 SERVER = get_config_if_env("SERVER", "main", "remote_settings_url")
-BUCKET = config.get("main", "remote_settings_bucket")
+BUCKET = "main-workspace"
 COLLECTION = "tracking-protection-lists-ios"
 AUTHORIZATION = get_config_if_env("AUTHORIZATION", "main", "remote_settings_authorization")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local").lower()
@@ -86,10 +86,10 @@ def publish2rs():
 
     if ENVIRONMENT == "dev":
         # Self approve changes on DEV.
-        client.patch_collection(data={"status": "to-sign"})
+        client.approve_changes(message="r+")
         print("Changes applied to dev server ✅")
     else:
         # Request review.
         print("Request review...", end="")
-        client.patch_collection(data={"status": "to-review"})
+        client.request_review(message="r?")
         print("✅")
