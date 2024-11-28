@@ -151,11 +151,7 @@ def main():
     print("All content blocker rules have been generated successfully.")
 
     # Push to remote settings
-    try:
-        publish2rs()
-    except Exception as e:
-        print(f"Failed to push to RS. Make sure your environment variables are set correctly.")
-        return os.EX_CONFIG
+    publish2rs()
 
     return os.EX_OK
 
