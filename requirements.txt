@@ -3,4 +3,4 @@ publicsuffixlist==0.7.5
 requests==2.32.0
 trackingprotection-tools==0.6.1
 packaging==20.4
-kinto-http==11.6.0
+kinto-http==11.7.0
