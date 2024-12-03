@@ -27,10 +27,15 @@ BUCKET = "main-workspace"
 COLLECTION = "tracking-protection-lists-ios"
 AUTHORIZATION = get_config_if_env("AUTHORIZATION", "main", "remote_settings_authorization")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local").lower()
+DRY_RUN = os.getenv("DRY_RUN", "0") in "1yY"
 
 def publish2rs():
     client = kinto_http.Client(
-        server_url=SERVER, auth=AUTHORIZATION, bucket=BUCKET, collection=COLLECTION
+        server_url=SERVER,
+        auth=AUTHORIZATION,
+        bucket=BUCKET,
+        collection=COLLECTION,
+        dry_mode=DRY_RUN
     )
 
     remote_attachments = {
