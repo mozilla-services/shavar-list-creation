@@ -19,9 +19,8 @@ def process_and_sort_domains(domains):
     """Sorts and adds domains to the list, returning successfully added domains."""
     added_domains = []
     previous_domain = None
-    output = []
     for domain in sorted(domains):
-        if add_domain_to_list(domain, domain, previous_domain, None, output):
+        if add_domain_to_list(domain, domain, previous_domain, None, []):
             added_domains.append(domain)
             previous_domain = domain
     return added_domains
@@ -55,6 +54,36 @@ def find_entity_for_resource(resource, entities):
     return None
 
 def build_rule(resource, action_type, entities):
+    """
+    Builds a content blocking rule for WebKit based on the given resource, action type, and associated entities.
+
+    Content blocking rules in WebKit follow a declarative format.
+    Each rule consists of a `trigger` defining when the rule activates and an `action` specifying what 
+    happens when it is activated.
+
+    - `resource`: The URL to block (used to create a `url-filter`).
+    - `action_type`: The action type, e.g., "block" or "block-cookies".
+    - `entities`: A mapping of resources to their associated entities and properties.
+
+    The `url-filter` is derived from the `resource`, specifying the URL pattern to match.
+    If an entity is found for the resource, its properties are used to populate `unless-domain`, 
+    which specifies domains exempted from this rule.
+
+    The `load-type` is set to `["third-party"]` to limit the rule to third-party resources.
+    NOTE: We can support first-party later by including `["first-party"]`.
+
+    Example of a WebKit rule:
+    {
+        "trigger": {
+            "url-filter": "evil-tracker\\.js",
+            "unless-domain": ["trusted.com"]
+        },
+        "action": {
+            "type": "block"
+        }
+    }
+    For more information, see: https://webkit.org/blog/3476/content-blockers-first-look/
+    """
     url_filter = build_url_filter(resource)
     entity = entities.get(resource) or find_entity_for_resource(resource, entities)
     unless_domains = [f"*{domain}" for domain in entity["properties"]] if entity and isinstance(entity.get("properties"), list) else []
