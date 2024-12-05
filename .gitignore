@@ -16,3 +16,4 @@ __pycache__/
 # coverage files
 .coverage
 .venv/
+webkit-lists/
