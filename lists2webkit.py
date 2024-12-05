@@ -1,6 +1,7 @@
 import json
 import os
 from settings import config
+from publish2rs import publish2rs
 from constants import (
     DNT_SECTIONS,
     PRE_DNT_SECTIONS,
@@ -148,6 +149,11 @@ def main():
             generate_webkit_lists(domains, WEBKIT_BLOCK_COOKIES, ios_include_as, entities)
 
     print("All content blocker rules have been generated successfully.")
+
+    # Push to remote settings
+    publish2rs()
+
+    return os.EX_OK
 
 if __name__ == "__main__":
     main()
