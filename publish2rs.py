@@ -91,7 +91,8 @@ def publish2rs():
 
     if ENVIRONMENT == "dev":
         # Self approve changes on DEV.
-        client.approve_changes(message="r+")
+        # message arg is not supported as of now.
+        client.approve_changes()
         print("Changes applied to dev server ✅")
     else:
         # Request review.
