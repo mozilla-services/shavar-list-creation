@@ -20,4 +20,5 @@ RUN python -m pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code
 COPY --chown=app:app . .
 
-CMD ["sh", "enrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["run"]
