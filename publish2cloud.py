@@ -172,7 +172,7 @@ def new_data_to_publish_to_remote_settings(config, section, new, version=None):
     # Check to see if update is needed on Remote Settings
     record = get_record_remote_settings(record_name)
 
-    if version is None:
+    if version is None and record:
         # We need to check if the filter_expression needs to be updated for the
         # nightly records. The filter_expression needs to be updated if the
         # latest supported version has changed
