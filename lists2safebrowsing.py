@@ -13,14 +13,12 @@ from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
 
 from constants import (
-    DNT_EMAIL_SECTIONS,
     DNT_SECTIONS,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
     LARGE_ENTITIES_SECTIONS,
     STANDARD_ENTITY_SECTION,
     TEST_DOMAIN_TEMPLATE,
-    VERSION_EMAIL_CATEGORY_INTRODUCED,
     VERS_LARGE_ENTITIES_SEPARATION_STARTED,
     ENTITYLIST_SECTIONS
 )
@@ -28,7 +26,8 @@ from constants import (
 from utils import (
     get_blocked_domains,
     add_domain_to_list,
-    load_json_from_url
+    load_json_from_url,
+    should_skip_section_for_version,
 )
 
 from publish2cloud import (
@@ -442,10 +441,8 @@ def get_versioned_lists(config, chunknum, version):
         version_configurations(config, section, version)
         ver = p_version.parse(version)
         if (section in PRE_DNT_SECTIONS or section in DNT_SECTIONS):
-            skip_section = (
-                section in DNT_EMAIL_SECTIONS
-                and ver.release[0] < VERSION_EMAIL_CATEGORY_INTRODUCED
-            )
+            skip_section = should_skip_section_for_version(config, section, ver.release[0])
+
             if skip_section:
                 # import ipdb; ipdb.set_trace()
                 continue

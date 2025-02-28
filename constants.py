@@ -56,10 +56,7 @@ DNT_SECTIONS = (
     "tracking-protection-email-content",
     "tracking-protection-email-base",
 )
-DNT_EMAIL_SECTIONS = (
-    "tracking-protection-email-content",
-    "tracking-protection-email-base",
-)
+
 DNT_CONTENT_SECTIONS = (
     "tracking-protection-content",
     "tracking-protection-contenteff",
@@ -104,7 +101,6 @@ LARGE_ENTITIES = [
 ]
 
 VERS_LARGE_ENTITIES_SEPARATION_STARTED = 74
-VERSION_EMAIL_CATEGORY_INTRODUCED = 97
 
 WEBKIT_LISTS_DIR = 'webkit-lists'
 WEBKIT_BLOCK_ALL = "block"
