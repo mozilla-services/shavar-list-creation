@@ -5,6 +5,7 @@ import hashlib
 from trackingprotection_tools import DisconnectParser
 import sys
 import json
+from packaging import version as p_version
 from publicsuffixlist import PublicSuffixList
 from publicsuffixlist.update import updatePSL
 from urllib.request import urlopen
@@ -199,3 +200,17 @@ def get_domains_from_filters(parser, category_filters,
               (len(result), tag_filters, len(output)))
 
     return output
+
+def should_skip_section_for_version(config, section, version):
+    """
+    Checks if the section should be skipped for the given version.
+    """
+    skip_section = False
+
+    min_supported_version = (config.has_option(section, 'min_supported_version')
+                             and p_version.parse(config.get(section, 'min_supported_version')))
+
+    if min_supported_version and version < min_supported_version.release[0]:
+        skip_section = True
+
+    return skip_section

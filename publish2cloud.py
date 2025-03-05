@@ -33,6 +33,8 @@ from settings import (
     shared_state
 )
 
+from utils import should_skip_section_for_version
+
 from kinto_http import Client, BearerTokenAuth, KintoException
 
 try:
@@ -170,7 +172,7 @@ def new_data_to_publish_to_remote_settings(config, section, new, version=None):
     # Check to see if update is needed on Remote Settings
     record = get_record_remote_settings(record_name)
 
-    if version is None:
+    if version is None and record:
         # We need to check if the filter_expression needs to be updated for the
         # nightly records. The filter_expression needs to be updated if the
         # latest supported version has changed
@@ -356,6 +358,11 @@ def publish_to_cloud(config, chunknum, check_versioning=None):
                 continue
 
             version = p_version.parse(config.get(section, 'version'))
+            skip_section = should_skip_section_for_version(config, section, version.release[0])
+
+            if skip_section:
+                continue
+
             skip_large_entity_separation = (
                 version.release[0] < VERS_LARGE_ENTITIES_SEPARATION_STARTED
                 and section in LARGE_ENTITIES_SECTIONS
