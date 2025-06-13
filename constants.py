@@ -57,6 +57,7 @@ DNT_SECTIONS = (
     "tracking-protection-email-base",
     # consent manager trackers added in 2025
     "tracking-protection-consent-manager",
+    "tracking-protection-anti-fraud",
 )
 
 DNT_CONTENT_SECTIONS = (
