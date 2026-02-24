@@ -172,7 +172,12 @@ def new_data_to_publish_to_remote_settings(config, section, new, version=None):
     # Check to see if update is needed on Remote Settings
     record = get_record_remote_settings(record_name)
 
-    if version is None and record:
+    versioning_needed = (
+        config.has_option(section, 'versioning_needed')
+        and config.getboolean(section, 'versioning_needed')
+    )
+
+    if version is None and record and versioning_needed:
         # We need to check if the filter_expression needs to be updated for the
         # nightly records. The filter_expression needs to be updated if the
         # latest supported version has changed
@@ -315,14 +320,23 @@ def publish_to_remote_settings(config, section, chunknum, version):
         'Name': list_name,
         'Checksum': chunk_file['checksum'],
         'Version': chunknum,
-        # The default master branch is the latest list in shavar-prod-lists, we use filter_expression
-        # to make sure only the latest fx versions use this list by setting the expression to greater than
-        # the "latest_supported_version" + 1 .0a1, since the latest_supported_version is the highest version number in
-        # the shavar prod lists branch names
-        'filter_expression': f'env.version|versionCompare("{shared_state.latest_supported_version+1}.0a1") >= 0'
     }
 
-    # Add fields for versioned lists
+    versioning_needed = (
+        config.has_option(section, 'versioning_needed')
+        and config.getboolean(section, 'versioning_needed')
+    )
+
+    # For versioned sections published on the default/master branch, use filter_expression
+    # to make sure only the latest fx versions use this list by setting the expression to
+    # greater than the "latest_supported_version" + 1 .0a1, since the latest_supported_version
+    # is the highest version number in the shavar prod lists branch names.
+    # Non-versioned sections (e.g. harmfuladdon-protection-blocklist) should not have a
+    # filter_expression so they are served to all clients.
+    if versioning_needed and version is None:
+        record_data['filter_expression'] = f'env.version|versionCompare("{shared_state.latest_supported_version+1}.0a1") >= 0'
+
+    # Add filter_expression and fields for versioned lists
     if version is not None:
         record_data['id'] = f'{list_name}-{math.trunc(version.release[0])}'
 
