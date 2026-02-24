@@ -58,6 +58,8 @@ DNT_SECTIONS = (
     # consent manager trackers added in 2025
     "tracking-protection-consent-manager",
     "tracking-protection-anti-fraud",
+    # harmful addon protection blocklist added in 2026
+    "harmfuladdon-protection-blocklist",
 )
 
 DNT_CONTENT_SECTIONS = (
