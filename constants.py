@@ -107,6 +107,13 @@ LARGE_ENTITIES = [
 
 VERS_LARGE_ENTITIES_SEPARATION_STARTED = 74
 
+# In the Jenkins environment we only generate and publish lists for the ESR
+# baseline (Firefox 115). Every other version is handled elsewhere (GKE /
+# Remote Settings), so the Jenkins job only needs to populate this one version.
+# This is intentionally hardcoded: the ESR baseline served by Jenkins is fixed
+# and will not change.
+JENKINS_ESR_VERSION = 115
+
 WEBKIT_LISTS_DIR = 'webkit-lists'
 WEBKIT_BLOCK_ALL = "block"
 WEBKIT_BLOCK_COOKIES = "block-cookies"

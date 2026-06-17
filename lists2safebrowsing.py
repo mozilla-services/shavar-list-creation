@@ -14,6 +14,7 @@ from publicsuffixlist.update import updatePSL
 
 from constants import (
     DNT_SECTIONS,
+    JENKINS_ESR_VERSION,
     PLUGIN_SECTIONS,
     PRE_DNT_SECTIONS,
     LARGE_ENTITIES_SECTIONS,
@@ -37,6 +38,7 @@ from publish2cloud import (
 
 from settings import (
     config,
+    execution_environment,
     shared_state
 )
 
@@ -470,6 +472,16 @@ def start_versioning(config, chunknum, shavar_prod_lists_branches):
         ver = p_version.parse(branch_name)
 
         if isinstance(ver, p_version.Version):
+            # In the Jenkins environment we only populate the ESR baseline, so
+            # skip every other version branch. This keeps the run short enough
+            # to avoid the Jenkins build timeout (which manifests as exit 143).
+            if (execution_environment == "JENKINS"
+                    and ver.release[0] != JENKINS_ESR_VERSION):
+                print('\n\n*** Skipping {ver}: Jenkins only populates ESR {esr} ***'.format(
+                    ver=branch_name, esr=JENKINS_ESR_VERSION)
+                )
+                continue
+
             print('\n\n*** Start Versioning for {ver} ***'.format(
                 ver=branch_name)
             )
