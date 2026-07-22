@@ -58,8 +58,13 @@ def publish2rs():
             to_create.append({"name": name})
         elif remote_attachment["hash"] != hash:
             to_update.append({"id": remote_attachment["id"], "name": name})
-    # Remaining records in `remote_attachments` are to be deleted.
-    to_delete = [{"id": record["id"]} for _, record in remote_attachments.items()]
+    # Remaining records in `remote_attachments` are to be deleted but only records the
+    # pipeline manages (disconnect-prefixed).
+    to_delete = [
+        {"id": record["id"]}
+        for name, record in remote_attachments.items()
+        if name.startswith("disconnect-")
+    ]
 
     # Print changes
     print("Changes to apply:")
